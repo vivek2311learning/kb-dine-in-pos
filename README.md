@@ -1,59 +1,135 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# KB Dine-In POS 🍽️
 
-## Getting Started
+KB Dine-In POS is a restaurant dine-in management system built with Next.js and MongoDB.
 
-First, run the development server:
+It helps restaurants manage tables, orders, kitchen workflow, and billing through role-based staff panels.
 
-```bash
+---
+
+## Features
+
+### Authentication & Authorization
+
+- JWT based authentication
+- Role based access control
+- Protected routes using middleware
+
+### Admin Panel
+
+- Dashboard overview
+- Menu management
+- Staff management
+- Reports
+
+### Counter System
+
+- Table management
+- Create orders
+- Add items to order
+- Billing
+
+### Kitchen System
+
+- Kitchen order queue
+- Mark items ready
+- Track served items
+
+---
+
+## Tech Stack
+
+Frontend
+
+- Next.js
+- React
+- TypeScript
+- Tailwind CSS
+
+Backend
+
+- Next.js API Routes
+- Node.js
+
+Database
+
+- MongoDB
+- Mongoose
+
+Security
+
+- JWT Authentication
+- Role-based authorization
+- Middleware protection
+
+---
+
+## Project Structure
+
+app/
+api/
+components/
+lib/
+models/
+middleware.ts
+
+---
+
+## Installation
+
+Clone the repository
+
+bash
+git clone https://github.com/YOUR_USERNAME/kb-dine-in-pos.git
+
+Install dependencies
+
+bash
+npm install
+
+Run development server
+
+bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+App will run at:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+http://localhost:3000
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## User Roles
 
-To learn more about Next.js, take a look at the following resources:
+The system has three roles:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Admin  
+Counter  
+Kitchen
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Each role has access to specific dashboards and APIs.
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Environment Variables
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Create a .env.local file based on .env.example.
 
-=> intialize next.js project with ts,tailwind,eslint,app-router
-=> intstall all libraries
-=> set up all files and folder stracture with routng and meta data
-=> theme set up with tailwind,globle.css,tailind.config.ts,postcss.config.mjs
-=> Eslint set up
-=> prettier set up
-=> husky set up
-=> DB connection set up
-=> all ui design
-=> authentication and authorization set up
-=>working files
-1.app/(auth)/login/page.tsx
-2.app/api/auth/login/route.ts
-3.app/api/auth/logout/route.ts
-4.app/lib/auth/jwt.ts
-5.app/lib/models/user.ts
-6.middleware.ts
-7.scripts/seed-users.cjs
-8.components/layout/navigation-bar.tsx
-9.components/layout/admin-sidebar.tsx
-10.components/layout/counter-sidebar.tsx
-11.components/layout/kitchen-sidebar.tsx
+Example:
+
+MONGODB_URI=your_mongodb_connection_string
+JWT_SECRET=your_secret_key
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+---
+
+## Future Improvements
+
+- Real-time updates with WebSockets
+- Online payment integration
+- Mobile app
+- Inventory management
+
+---
+
+## License
+
+This project is for learning and development purposes.
