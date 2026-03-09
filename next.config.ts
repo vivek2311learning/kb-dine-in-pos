@@ -1,7 +1,5 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
-  /* config options here */
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  // assetPrefix: '', // Isse hata dein agar yeh line hai
 };
-
 export default nextConfig;

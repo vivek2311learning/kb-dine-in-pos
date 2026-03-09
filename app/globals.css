@@ -1,26 +1,89 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* --------------------
+   GLOBAL BASE
+-------------------- */
+
+html,
+body {
+  font-family: var(--font-body);
+  background-image: url('/textures/paper.png');
+  background-repeat: repeat;
+  background-size: auto;
+  min-height: 100%;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* --------------------
+   HEADINGS FONT
+-------------------- */
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-rustic);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* --------------------
+   MUTED TEXT
+-------------------- */
+
+.text-muted {
+  opacity: 0.8;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.animate-fade-in {
+  animation: fadeIn 220ms ease-out;
 }
+
+/* <button
+  className="
+    btn-wood
+    px-6 py-3
+    rounded-wood
+    shadow-wood
+    text-white
+    font-rustic
+    tracking-wide
+    transition-all
+    duration-200
+  "
+>
+  View Menu
+</button> */
+/* Menu Tab */
+/* <div
+  className="
+    menu-tab
+    px-5 py-2
+    rounded-wood
+    shadow-insetWood
+    text-white
+    font-rustic
+  "
+>
+  Starters
+</div> */
+/* Card */
+/* <div
+  className="
+    card-rustic
+    rounded-wood
+    shadow-wood
+    p-4
+    text-white
+  "
+>
+  Paneer Butter Masala
+</div> */
