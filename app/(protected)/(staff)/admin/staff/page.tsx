@@ -15,30 +15,41 @@ interface Staff {
 
 export default function AdminStaffPage() {
   const router = useRouter();
+
   const [staff, setStaff] = useState<Staff[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
+
+  /* ================= FETCH ================= */
 
   const fetchStaff = async () => {
-    const res = await fetch('/api/admin/staff');
-    const data = await res.json();
-    setStaff(data);
+    try {
+      const res = await fetch('/api/admin/staff', { cache: 'no-store' });
+      const data = await res.json();
+
+      setStaff(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     fetchStaff();
   }, []);
 
-  // const deactivate = async (id: string) => {
-  //   const confirmDelete = window.confirm('Deactivate this staff member?');
-  //   if (!confirmDelete) return;
-
-  //   await fetch(`/api/admin/staff/${id}`, {
-  //     method: 'DELETE',
-  //   });
-
-  //   fetchStaff();
-  // };
+  /* ================= ACTION ================= */
 
   const updateStatus = async (id: string, active: boolean) => {
+    const confirmAction = window.confirm(
+      active ? 'Activate this staff member?' : 'Deactivate this staff member?',
+    );
+
+    if (!confirmAction) return;
+
     await fetch(`/api/admin/staff/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -48,34 +59,115 @@ export default function AdminStaffPage() {
     fetchStaff();
   };
 
+  /* ================= ROLE COLOR ================= */
+
+  const roleColor = (role: string) => {
+    if (role === 'admin') return 'bg-purple-100 text-purple-700';
+    if (role === 'counter') return 'bg-blue-100 text-blue-700';
+    if (role === 'kitchen') return 'bg-yellow-100 text-yellow-700';
+
+    return 'bg-gray-100 text-gray-600';
+  };
+
+  /* ================= FILTER ================= */
+
+  const filtered = staff.filter(
+    (s) =>
+      (!roleFilter || s.role === roleFilter) &&
+      s.name.toLowerCase().includes(search.toLowerCase()),
+  );
+
+  if (loading) {
+    return <div className="p-6 text-gray-500">Loading staff...</div>;
+  }
+
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Staff Management</h1>
+    <div className="p-4 md:p-8 space-y-6 max-w-5xl mx-auto">
+      {/* HEADER */}
+
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+        <h1 className="text-2xl md:text-3xl font-bold">Staff Management</h1>
 
         <Button onClick={() => router.push('/admin/staff/new')}>
           + Add Staff
         </Button>
       </div>
 
+      {/* SEARCH + FILTER */}
+
+      <div className="flex flex-col md:flex-row gap-3">
+        <input
+          type="text"
+          placeholder="🔍 Search staff..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="border rounded-lg px-4 py-2 text-sm w-full md:w-72"
+        />
+
+        <div>
+          <label htmlFor="role-filter" className="sr-only">
+            Filter by role
+          </label>
+
+          <select
+            id="role-filter"
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+            className="border rounded-lg px-3 py-2 text-sm w-full md:w-40"
+          >
+            <option value="">All Roles</option>
+            <option value="admin">Admin</option>
+            <option value="counter">Counter</option>
+            <option value="kitchen">Kitchen</option>
+          </select>
+        </div>
+      </div>
+
+      {/* COUNT */}
+
+      <p className="text-sm text-gray-500">{filtered.length} staff members</p>
+
+      {/* EMPTY */}
+
+      {filtered.length === 0 && (
+        <p className="text-gray-500">No staff members found</p>
+      )}
+
+      {/* LIST */}
+
       <div className="space-y-4">
-        {staff.map((user) => (
+        {filtered.map((user) => (
           <Card key={user._id} className="p-4">
-            <div className="flex justify-between items-center">
-              <div>
+            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+              {/* INFO */}
+
+              <div className="space-y-1">
                 <p className="font-semibold">{user.name}</p>
-                <p className="text-sm text-gray-500">{user.email}</p>
-                <p className="text-xs mt-1">Role: {user.role}</p>
-                <p
-                  className={`text-xs mt-1 ${
-                    user.isActive ? 'text-green-600' : 'text-red-600'
-                  }`}
-                >
-                  {user.isActive ? 'Active' : 'Inactive'}
-                </p>
+
+                <p className="text-sm ">{user.email}</p>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span
+                    className={`text-xs px-2 py-1 rounded ${roleColor(user.role)}`}
+                  >
+                    {user.role}
+                  </span>
+
+                  <span
+                    className={`text-xs px-2 py-1 rounded ${
+                      user.isActive
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-red-100 text-red-700'
+                    }`}
+                  >
+                    {user.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
               </div>
 
-              <div className="flex gap-2">
+              {/* ACTIONS */}
+
+              <div className="flex flex-wrap gap-2">
                 <Button
                   onClick={() => router.push(`/admin/staff/${user._id}/edit`)}
                 >

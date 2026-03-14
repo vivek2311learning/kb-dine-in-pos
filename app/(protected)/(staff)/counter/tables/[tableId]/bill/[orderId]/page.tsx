@@ -21,6 +21,7 @@ export default function BillPage() {
 
   const [items, setItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
 
   /* ---------------- LOAD ORDER ---------------- */
 
@@ -28,99 +29,154 @@ export default function BillPage() {
     if (!orderId) return;
 
     const loadOrder = async () => {
-      const res = await fetch(`/api/counter/orders/${orderId}`);
+      try {
+        const res = await fetch(`/api/counter/orders/${orderId}`);
 
-      if (!res.ok) {
+        if (!res.ok) throw new Error('Failed to load order');
+
+        const data = await res.json();
+
+        /* order already paid */
+
+        if (data.order?.status === 'paid') {
+          router.replace('/counter/tables');
+          return;
+        }
+
+        /* only served items */
+
+        const servedItems = (data.items || []).filter(
+          (i: OrderItem) => i.kitchenStatus?.toLowerCase() === 'served'
+        );
+
+        setItems(servedItems);
+
+      } catch (err) {
+        console.error(err);
+      } finally {
         setLoading(false);
-        return;
       }
-
-      const data = await res.json();
-
-      if (data.order?.status === 'paid') {
-        router.replace('/counter/tables');
-        return;
-      }
-
-      const servedItems = (data.items || []).filter(
-        (i: OrderItem) => i.kitchenStatus?.toLowerCase() === 'served',
-      );
-
-      setItems(servedItems);
-      setLoading(false);
     };
 
     loadOrder();
-  }, [orderId]);
+  }, [orderId, router]);
 
   /* ---------------- TOTAL ---------------- */
 
   const subtotal = items.reduce(
     (sum, item) => sum + item.priceSnapshot * item.quantity,
-    0,
+    0
   );
 
   /* ---------------- PRINT + PAYMENT ---------------- */
 
   const handlePrintAndPay = async () => {
-    if (!orderId || items.length === 0) return;
+    if (!orderId || items.length === 0 || processing) return;
 
-    const res = await fetch('/api/counter/bills/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderId }),
-    });
+    setProcessing(true);
 
-    if (!res.ok) {
-      const err = await res.json();
-      console.log(err);
-      return;
+    try {
+      const res = await fetch('/api/counter/bills/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        console.error(err);
+        setProcessing(false);
+        return;
+      }
+
+      const bill = await res.json();
+
+      /* open print dialog */
+
+      window.print();
+
+      /* allow print dialog to open */
+
+      setTimeout(() => {
+        router.push(`/counter/tables/${tableId}/payment/${bill._id}`);
+      }, 600);
+
+    } catch (err) {
+      console.error(err);
+      setProcessing(false);
     }
-
-    const bill = await res.json();
-
-    // 1️⃣ Print
-    window.print();
-
-    // 2️⃣ Small delay (ensures print dialog opens)
-    setTimeout(() => {
-      router.push(`/counter/tables/${tableId}/payment/${bill._id}`);
-    }, 500);
   };
 
-  if (loading) return <div className="p-6">Loading...</div>;
+  /* ---------------- UI ---------------- */
+
+  if (loading) {
+    return (
+      <div className="p-6 text-center text-gray-500">
+        Loading bill...
+      </div>
+    );
+  }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto bg-white">
-      <h1 className="text-2xl font-bold mb-6 text-center">Bill Summary</h1>
+    <div className="p-6 max-w-2xl mx-auto rounded shadow-2xl border">
+
+      <h1 className="text-2xl font-bold mb-6 text-center">
+        Bill Summary
+      </h1>
 
       {items.length === 0 && (
-        <div className="text-center text-gray-400">No served items yet</div>
+        <div className="text-center text-gray-400">
+          No served items yet
+        </div>
       )}
 
       {items.map((item) => (
-        <div key={item._id} className="flex justify-between border-b py-2">
+
+        <div
+          key={item._id}
+          className="flex justify-between border-b py-2"
+        >
+
           <span>
             {item.nameSnapshot} × {item.quantity}
           </span>
-          <span>₹{item.priceSnapshot * item.quantity}</span>
+
+          <span>
+            ₹{item.priceSnapshot * item.quantity}
+          </span>
+
         </div>
+
       ))}
 
+      {/* TOTAL */}
+
       <div className="mt-6 text-lg font-bold flex justify-between border-t pt-4">
+
         <span>Total</span>
+
         <span>₹{subtotal}</span>
+
       </div>
 
+      {/* PRINT BUTTON */}
+
       <div className="mt-6">
+
         <Button
           onClick={handlePrintAndPay}
-          disabled={items.length === 0}
-          className="w-full bg-amber-600 text-white py-2 rounded"
+          disabled={items.length === 0 || processing}
+          className="w-full bg-amber-600 text-white py-2"
         >
-          🖨 Print Bill & Proceed to Payment
+
+          {processing
+            ? 'Processing...'
+            : '🖨 Print Bill & Proceed to Payment'}
+
         </Button>
+
       </div>
+
     </div>
   );
 }

@@ -27,15 +27,13 @@ export async function GET(
 
     const items = await OrderItem.find({
       orderId: id,
-      cancelled: false,
-    });
+      cancelled: { $ne: true },
+    }).sort({ createdAt: 1 });
 
-    return NextResponse.json({
-      order,
-      items,
-    });
+    return NextResponse.json({ order, items });
   } catch (err: any) {
     console.error('Order Fetch Error:', err);
+
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

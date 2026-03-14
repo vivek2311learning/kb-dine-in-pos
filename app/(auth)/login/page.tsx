@@ -2,12 +2,21 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+
 import { Loader } from '@/app/components/ui/loader';
 import { useNotification } from '@/app/components/notification/provider';
-import { Container } from '@/app/components/layout/container';
+import { Container } from '@/app/components/ui/container';
 import { Button } from '@/app/components/ui/button';
 import { Card } from '@/app/components/ui/card';
 import { Input } from '@/app/components/ui/input';
+
+type Role = 'admin' | 'counter' | 'kitchen';
+
+function redirectByRole(router: any, role: Role) {
+  if (role === 'admin') router.replace('/admin/dashboard');
+  if (role === 'counter') router.replace('/counter/tables');
+  if (role === 'kitchen') router.replace('/kitchen/orders');
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,6 +25,7 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,19 +60,9 @@ export default function LoginPage() {
 
     if (!roleMatch) return;
 
-    const role = roleMatch[1];
+    const role = roleMatch[1] as Role;
 
-    if (role === 'admin') {
-      router.replace('/admin/dashboard');
-    }
-
-    if (role === 'counter') {
-      router.replace('/counter/tables');
-    }
-
-    if (role === 'kitchen') {
-      router.replace('/kitchen/orders');
-    }
+    redirectByRole(router, role);
   }, [router]);
 
   /* ---------------- LOGIN SUBMIT ---------------- */
@@ -89,17 +89,20 @@ export default function LoginPage() {
         throw new Error(data.error || 'Invalid credentials');
       }
 
-      if (data.role === 'admin') {
-        router.replace('/admin/dashboard');
-      } else if (data.role === 'counter') {
-        router.replace('/counter/tables');
-      } else if (data.role === 'kitchen') {
-        router.replace('/kitchen/orders');
-      }
-    } catch (err: any) {
-      show('error', 'Invalid email or password', 'Login Failed');
-      setError(err.message);
+      redirectByRole(router, data.role);
+
+    } catch (err: unknown) {
+
+      const message =
+        err instanceof Error ? err.message : 'Login failed';
+
+      show('error', message, 'Login Failed');
+      setError(message);
+
+    } finally {
+
       setLoading(false);
+
     }
   };
 
@@ -107,15 +110,21 @@ export default function LoginPage() {
 
   return (
     <Container className="py-20">
+
       <div className="max-w-md mx-auto">
+
         <Card className="p-6">
+
           <div className="text-center mb-6">
+
             <h1 className="font-rustic text-3xl text-[#3b2a1a]">
               Welcome Back
             </h1>
+
           </div>
 
           <form className="space-y-4" onSubmit={handleSubmit}>
+
             <Input
               label="Email"
               type="email"
@@ -145,6 +154,7 @@ export default function LoginPage() {
               className="w-full py-3 flex items-center justify-center gap-2"
               disabled={loading}
             >
+
               {loading ? (
                 <>
                   <Loader size="sm" />
@@ -153,10 +163,15 @@ export default function LoginPage() {
               ) : (
                 'Login'
               )}
+
             </Button>
+
           </form>
+
         </Card>
+
       </div>
+
     </Container>
   );
 }

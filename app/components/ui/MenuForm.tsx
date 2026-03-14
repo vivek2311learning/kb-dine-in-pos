@@ -1,104 +1,146 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import { useRouter } from 'next/navigation';
+
 import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
+import { Input } from '@/app/components/ui/input';
+
+interface MenuItem {
+  _id?: string;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+}
 
 interface Props {
-  initialData?: any;
+  initialData?: MenuItem;
   isEdit?: boolean;
 }
 
 export default function MenuForm({ initialData, isEdit }: Props) {
   const router = useRouter();
 
-  const [name, setName] = useState(initialData?.name || '');
-  const [description, setDescription] = useState(
-    initialData?.description || '',
-  );
-  const [price, setPrice] = useState(initialData?.price || 0);
-  const [category, setCategory] = useState(initialData?.category || 'Starters');
+  const descriptionId = useId();
+  const categoryId = useId();
+
+  const [form, setForm] = useState<MenuItem>({
+    name: initialData?.name || '',
+    description: initialData?.description || '',
+    price: initialData?.price || 0,
+    category: initialData?.category || 'Starters',
+  });
+
   const [loading, setLoading] = useState(false);
 
+  const updateField = (field: keyof MenuItem, value: any) => {
+    setForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
   const handleSubmit = async () => {
-    if (!name || !price) return;
+    if (!form.name || !form.price) return;
 
     setLoading(true);
 
     const url = isEdit
-      ? `/api/admin/menu/${initialData._id}`
+      ? `/api/admin/menu/${initialData?._id}`
       : `/api/admin/menu`;
 
     const method = isEdit ? 'PATCH' : 'POST';
 
-    await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name,
-        description,
-        price,
-        category,
-      }),
-    });
+    try {
+      await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
 
-    setLoading(false);
-    router.push('/admin/menu');
+      router.push('/admin/menu');
+      router.refresh();
+    } catch (error) {
+      console.error('Menu save failed', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <Card className="p-6 space-y-4 max-w-xl mx-auto">
-      <h1 className="text-2xl font-bold">
+    <Card padding="lg" className="space-y-6 max-w-xl mx-auto">
+      
+      <h1 className="text-2xl font-bold font-rustic">
         {isEdit ? 'Edit Menu Item' : 'Add Menu Item'}
       </h1>
 
-      <div>
-        <label htmlFor="name" className="block mb-1 text-sm">
-          Name
-        </label>
-        <input
-          id="name"
-          className="border p-2 w-full rounded"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-      </div>
+      <Input
+        label="Name"
+        value={form.name}
+        placeholder="Item name"
+        onChange={(e) => updateField('name', e.target.value)}
+      />
 
-      <div>
-        <label htmlFor="description" className="block mb-1 text-sm">
+      {/* Description */}
+      <div className="space-y-1.5">
+        <label
+          htmlFor={descriptionId}
+          className="block font-rustic text-sm text-[#3b2a1a]"
+        >
           Description
         </label>
+
         <textarea
-          id="description"
-          className="border p-2 w-full rounded"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          id={descriptionId}
+          rows={3}
+          className="
+            w-full
+            px-4 py-2
+            rounded-lg
+            bg-[#f5efe6]
+            text-[#3b2a1a]
+            border border-[#3b2a1a]/30
+            focus:border-[#3b2a1a]
+            focus:outline-none
+            shadow-[inset_0_1px_2px_rgba(0,0,0,0.15)]
+          "
+          value={form.description}
+          onChange={(e) => updateField('description', e.target.value)}
         />
       </div>
 
-      <div>
-        <label htmlFor="price" className="block mb-1 text-sm">
-          Price
-        </label>
-        <input
-          id="price"
-          type="number"
-          className="border p-2 w-full rounded"
-          value={price}
-          onChange={(e) => setPrice(Number(e.target.value))}
-        />
-      </div>
+      <Input
+        label="Price"
+        type="number"
+        value={form.price}
+        onChange={(e) => updateField('price', Number(e.target.value))}
+      />
 
-      <div>
-        <label htmlFor="category" className="block mb-1 text-sm">
+      {/* Category */}
+      <div className="space-y-1.5">
+        <label
+          htmlFor={categoryId}
+          className="block font-rustic text-sm text-[#3b2a1a]"
+        >
           Category
         </label>
+
         <select
-          id="category"
-          className="border p-2 w-full rounded"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
+          id={categoryId}
+          className="
+            w-full
+            px-4 py-2
+            rounded-lg
+            bg-[#f5efe6]
+            text-[#3b2a1a]
+            border border-[#3b2a1a]/30
+            focus:border-[#3b2a1a]
+            focus:outline-none
+          "
+          value={form.category}
+          onChange={(e) => updateField('category', e.target.value)}
         >
           <option value="Starters">Starters</option>
           <option value="Main Course">Main Course</option>
@@ -107,9 +149,14 @@ export default function MenuForm({ initialData, isEdit }: Props) {
         </select>
       </div>
 
-      <Button onClick={handleSubmit} disabled={loading}>
-        {loading ? 'Saving...' : 'Save'}
+      <Button
+        onClick={handleSubmit}
+        disabled={loading}
+        className="w-full"
+      >
+        {loading ? 'Saving...' : isEdit ? 'Update Item' : 'Save Item'}
       </Button>
+
     </Card>
   );
 }

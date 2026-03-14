@@ -2,162 +2,126 @@
 
 import { useEffect, useState } from 'react';
 import { Card } from '@/app/components/ui/card';
-import { Button } from '@/app/components/ui/button';
+import StarRating from '@/app/components/ui/starRating';
+import { useRouter } from 'next/navigation';
 
-interface OverviewData {
-  totalBills: number;
-  totalRevenue: number;
-  refundCount: number;
-  refundAmount: number;
-  wastageCount: number;
-  wastageValue: number;
+interface Analytics {
+  feedback: any;
+  revenue: any;
+  tables: any;
+  orders: any;
+  insights: any;
 }
 
 export default function AdminReportsPage() {
-  const [data, setData] = useState<OverviewData | null>(null);
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const fetchOverview = async () => {
-    setLoading(true);
-
-    let url = '/api/admin/reports/overview';
-
-    if (from && to) {
-      url += `?from=${from}&to=${to}`;
-    }
-
-    const res = await fetch(url);
-    const result = await res.json();
-
-    setData(result);
-    setLoading(false);
-  };
-
+  const [data, setData] = useState<Analytics | null>(null);
+  const router = useRouter();
   useEffect(() => {
-    fetchOverview();
+    fetch('/api/admin/analytic', { cache: 'no-store' })
+      .then((res) => res.json())
+      .then(setData)
+      .catch(console.error);
   }, []);
 
-  /* ================= INSIGHTS ================= */
-
-  const [insights, setInsights] = useState<any>(null);
-
-  const fetchInsights = async () => {
-    const res = await fetch('/api/admin/reports/insights');
-    const data = await res.json();
-    setInsights(data);
-  };
-
-  useEffect(() => {
-    fetchInsights();
-  }, []);
+  if (!data) {
+    return <div className="p-6 text-gray-500">Loading reports...</div>;
+  }
 
   return (
-    <div className="p-8 space-y-8">
-      <h1 className="text-3xl font-bold">Reports Overview</h1>
+    <div className="p-6 md:p-8 space-y-8 max-w-6xl mx-auto">
+      <h1 className="text-3xl font-bold">Reports & Analytics</h1>
 
-      {/* ================= DATE FILTER ================= */}
+      {/* ================= REVENUE SUMMARY ================= */}
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card
+          className="p-4 text-center"
+          onClick={() => router.push('/admin/revenue')}
+        >
+          <p className="text-sm text-gray-500">Today's Revenue</p>
+          <p className="text-2xl font-bold mt-2">
+            ₹{data.revenue.todayRevenue}
+          </p>
+        </Card>
+
+        <Card
+          className="p-4 text-center"
+          onClick={() => router.push('/admin/bills?today=true')}
+        >
+          <p className="text-sm text-gray-500">Today's Bills</p>
+          <p className="text-2xl font-bold mt-2">{data.revenue.todaysBills}</p>
+        </Card>
+
+        <Card
+          className="p-4 text-center"
+          onClick={() => router.push('/admin/feedback')}
+        >
+          <p className="text-sm text-gray-500">Total Feedback</p>
+          <p className="text-2xl font-bold mt-2">
+            {data.feedback.totalFeedback}
+          </p>
+        </Card>
+
+        <Card className="p-4 text-center">
+          <p className="text-sm text-gray-500">Average Rating</p>
+          <span className="text-2xl font-bold mt-2  flex items-center justify-center">
+            <StarRating rating={data.feedback.avgRating} />
+            <p>{data.feedback.avgRating.toFixed(1)}</p>
+          </span>
+        </Card>
+      </div>
+
+      {/* ================= TOP ITEMS ================= */}
 
       <Card className="p-6">
-        <div className="flex flex-wrap gap-4 items-end">
+        <h2 className="text-xl font-semibold mb-4">Top Selling Items</h2>
+
+        {data.insights.topItems.map((item: any, i: number) => (
+          <div key={i} className="flex justify-between border-b py-2">
+            <span>{item._id}</span>
+
+            <span>{item.totalSold} sold</span>
+          </div>
+        ))}
+      </Card>
+
+      {/* ================= WASTAGE ================= */}
+
+      <Card className="p-6">
+        <h2 className="text-xl font-semibold mb-4">Wastage Analytics</h2>
+
+        <div className="flex gap-8">
           <div>
-            <label htmlFor="from-date" className="block text-sm mb-1">
-              From Date
-            </label>
-            <input
-              id="from-date"
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              className="border p-2 rounded"
-            />
+            <p className="text-sm text-gray-500">Items Wasted</p>
+
+            <p className="text-lg font-semibold">
+              {data.insights.wastageItems}
+            </p>
           </div>
 
           <div>
-            <label htmlFor="to-date" className="block text-sm mb-1">
-              To Date
-            </label>
-            <input
-              id="to-date"
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="border p-2 rounded"
-            />
-          </div>
+            <p className="text-sm text-gray-500">Wastage Value</p>
 
-          <Button onClick={fetchOverview}>
-            {loading ? 'Loading...' : 'Apply Filter'}
-          </Button>
+            <p className="text-lg font-semibold">
+              ₹{data.insights.wastageValue}
+            </p>
+          </div>
         </div>
       </Card>
 
-      {/* ================= OVERVIEW CARDS ================= */}
+      {/* ================= FEEDBACK DISTRIBUTION ================= */}
 
-      {data && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card className="p-6 text-center">
-            <p className="text-sm text-gray-500">Total Bills</p>
-            <p className="text-2xl font-bold mt-2">{data.totalBills}</p>
-          </Card>
+      <Card className="p-6">
+        <h2 className="text-xl font-semibold mb-4">Rating Distribution</h2>
 
-          <Card className="p-6 text-center">
-            <p className="text-sm text-gray-500">Total Revenue</p>
-            <p className="text-2xl font-bold mt-2">₹{data.totalRevenue}</p>
-          </Card>
+        {Object.entries(data.feedback.ratingCounts).map(([rating, count]) => (
+          <div key={rating} className="flex justify-between border-b py-2">
+            <span>{rating} ⭐</span>
 
-          <Card className="p-6 text-center">
-            <p className="text-sm text-gray-500">Refund Count</p>
-            <p className="text-2xl font-bold mt-2">{data.refundCount}</p>
-          </Card>
-
-          <Card className="p-6 text-center">
-            <p className="text-sm text-gray-500">Refund Amount</p>
-            <p className="text-2xl font-bold mt-2">₹{data.refundAmount}</p>
-          </Card>
-
-          <Card className="p-6 text-center">
-            <p className="text-sm text-gray-500">Wastage Items</p>
-            <p className="text-2xl font-bold mt-2">{data.wastageCount}</p>
-          </Card>
-
-          <Card className="p-6 text-center">
-            <p className="text-sm text-gray-500">Wastage Value</p>
-            <p className="text-2xl font-bold mt-2">₹{data.wastageValue}</p>
-          </Card>
-        </div>
-      )}
-
-      {insights && (
-        <div className="space-y-8">
-          {/* TOP ITEMS */}
-          <Card className="p-6">
-            <h2 className="text-xl font-semibold mb-4">
-              Top 4 Most Sold Items
-            </h2>
-
-            {insights.topItems.map((item: any, i: number) => (
-              <div key={i} className="flex justify-between border-b py-2">
-                <span>{item._id}</span>
-                <span>{item.totalSold} sold</span>
-              </div>
-            ))}
-          </Card>
-
-          {/* TOP REVENUE DAYS */}
-          <Card className="p-6">
-            <h2 className="text-xl font-semibold mb-4">Top Revenue Days</h2>
-
-            {insights.revenueDays.map((day: any, i: number) => (
-              <div key={i} className="flex justify-between border-b py-2">
-                <span>{day._id}</span>
-                <span>₹{day.totalRevenue}</span>
-              </div>
-            ))}
-          </Card>
-        </div>
-      )}
+            <span>{count as number}</span>
+          </div>
+        ))}
+      </Card>
     </div>
   );
 }

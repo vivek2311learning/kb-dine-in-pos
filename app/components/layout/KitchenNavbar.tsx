@@ -1,157 +1,169 @@
 'use client';
-// 👆 Ye batata hai ki ye component browser me run hoga (client side)
-// Isliye hum hooks jaise useState, useEffect use kar sakte hain
 
 import Link from 'next/link';
-// 👆 Page reload ke bina route change karne ke liye
-
-import { usePathname, useSearchParams, useRouter } from 'next/navigation';
-// usePathname → current URL path check karne ke liye
-// useSearchParams → URL ke query params (jaise ?flash=login)
-// useRouter → programmatically route change karne ke liye
+import {
+  usePathname,
+  useSearchParams,
+  useRouter,
+} from 'next/navigation';
 
 import { useNotification } from '../notification/provider';
-// 👆 Custom notification system (toast message show karne ke liye)
-
 import { useEffect, useState } from 'react';
-// useEffect → component load hone par kuch run karna
-// useState → component ke andar state manage karna
 
-// 🔹 Navbar me kaunse links honge
-const KITCHEN_NAV = [{ label: 'Orders', href: '/kitchen/orders' }];
+const KITCHEN_NAV = [
+  { label: 'Orders', href: '/kitchen/orders' },
+];
 
 export function KitchenNavbar() {
-  // 📍 Current URL path
   const pathname = usePathname();
-
-  // 🔄 Programmatic navigation
   const router = useRouter();
-
-  // 🔔 Notification show karne ka function
-  const { show } = useNotification();
-
-  // 🔎 URL ke query parameters read karne ke liye
   const params = useSearchParams();
 
-  // 📱 Mobile menu open/close state
+  const { show } = useNotification();
+
   const [isOpen, setIsOpen] = useState(false);
 
-  /*
-    🔔 Flash Message Logic
+  /* FLASH MESSAGE */
 
-    Agar URL me ?flash=login ho
-    to login success ka message show kare
-  */
   useEffect(() => {
     if (params.get('flash') === 'login') {
-      // Success notification show karo
       show('success', 'Welcome back!');
-
-      // URL se query parameter hata do
-      // taki reload par dobara message na aaye
-      window.history.replaceState({}, '', '/kitchen/orders');
+      router.replace('/kitchen/orders');
     }
-  }, [params, show]);
+  }, [params, router, show]);
 
-  /*
-    🔓 Logout Function
+  /* AUTO CLOSE MOBILE MENU */
 
-    - Backend logout API call karega
-    - Cookie delete karega
-    - User ko homepage par bhej dega
-  */
+  useEffect(() => {
+    setIsOpen(false);
+  }, [pathname]);
+
+  /* LOGOUT */
+
   const handleLogout = async () => {
-    // Server ko bolo logout karne ke liye
-    await fetch('/api/auth/logout', { method: 'POST' });
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
 
-    // Redirect homepage par
-    router.replace('/');
+      router.replace('/');
+      router.refresh();
+    } catch {
+      show('error', 'Logout failed');
+    }
   };
 
   return (
-    /*
-      🧱 Header Section
+    <header className="w-full shadow-sm bg-white/20 backdrop-blur-md border-b border-[#3b2a1a]/20">
 
-      - Full width
-      - Light shadow
-      - White background
-    */
-    <header className="w-full shadow-sm bg-white/20 backdrop-blur-md">
-      {/* Main container (center aligned content) */}
       <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-        {/* ================= LEFT SIDE (BRAND) ================= */}
+
+        {/* BRAND */}
 
         <div>
-          <h2 className="font-rustic text-xl text-[#3b2a1a]">Kitchen Panel</h2>
+          <h2 className="font-rustic text-xl text-[#3b2a1a]">
+            Kitchen Panel
+          </h2>
 
-          <p className="text-xs opacity-60">Order Preparation</p>
+          <p className="text-xs opacity-60">
+            Order Preparation
+          </p>
         </div>
 
-        {/* ================= DESKTOP NAVIGATION ================= */}
+        {/* DESKTOP NAV */}
 
-        {/* md:flex → medium screen se visible */}
-        {/* hidden → mobile par hide */}
         <nav className="hidden md:flex gap-6 items-center">
+
           {KITCHEN_NAV.map((item) => {
-            // Check karo kya current page active hai
             const isActive = pathname === item.href;
 
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`font-medium transition ${
-                  isActive
-                    ? 'text-[#3b2a1a] border-b-2 border-[#3b2a1a]'
-                    : 'text-gray-500 hover:text-[#3b2a1a]'
-                }`}
+                className={`
+                  relative font-medium transition
+                  ${
+                    isActive
+                      ? 'text-[#3b2a1a]'
+                      : 'text-gray-500 hover:text-[#3b2a1a]'
+                  }
+                `}
               >
                 {item.label}
+
+                {isActive && (
+                  <span
+                    className="
+                      absolute
+                      left-0
+                      -bottom-1
+                      w-full
+                      h-0.5
+                      bg-[#3b2a1a]
+                    "
+                  />
+                )}
               </Link>
             );
           })}
 
-          {/* Logout button desktop ke liye */}
           <button
             onClick={handleLogout}
-            className="text-red-600 font-medium hover:underline"
+            className="
+              text-red-600
+              font-medium
+              hover:underline
+            "
           >
             Logout
           </button>
+
         </nav>
 
-        {/* ================= MOBILE MENU BUTTON ================= */}
+        {/* MOBILE BUTTON */}
 
-        {/* md:hidden → desktop par hide */}
         <button
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={() => setIsOpen((prev) => !prev)}
           className="md:hidden text-[#3b2a1a]"
+          aria-label="Toggle kitchen menu"
         >
           ☰
         </button>
+
       </div>
 
-      {/* ================= MOBILE DROPDOWN ================= */}
+      {/* MOBILE MENU */}
 
-      {/* Agar isOpen true hai tabhi dikhega */}
-      {isOpen && (
-        <div className="md:hidden border-t px-6 py-4 space-y-4 bg-white">
+      <div
+         className={`
+          md:hidden shadow-sm bg-white/10 backdrop-blur-md
+          overflow-hidden transition-all duration-300
+          ${isOpen ? 'max-h-96 py-6 opacity-100' : 'max-h-0 py-0 opacity-0'}
+        `}
+      >
+
+        <div className="px-6 space-y-3">
+
           {KITCHEN_NAV.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              onClick={() => setIsOpen(false)}
               className="block text-gray-700"
             >
               {item.label}
             </Link>
           ))}
 
-          <button onClick={handleLogout} className="block text-red-600">
+          <button
+            onClick={handleLogout}
+            className="block text-red-600"
+          >
             Logout
           </button>
+
         </div>
-      )}
+
+      </div>
+
     </header>
   );
 }

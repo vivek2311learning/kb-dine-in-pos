@@ -5,103 +5,158 @@ import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 export default function FeedbackPage() {
-  const params = useParams();
-  const router = useRouter();
 
-  const tableId = params.tableId as string;
-  const orderId = params.orderId as string;
+const params = useParams();
+const router = useRouter();
 
-  const [rating, setRating] = useState<number>(0);
-  const [comment, setComment] = useState('');
-  const [loading, setLoading] = useState(false);
+const tableId = params.tableId as string;
+const orderId = params.orderId as string;
 
-  const handleSubmit = async () => {
-    if (!orderId) return;
+const [rating, setRating] = useState<number>(0);
+const [hover, setHover] = useState<number>(0);
 
-    setLoading(true);
+const [comment, setComment] = useState('');
+const [loading, setLoading] = useState(false);
 
-    const res = await fetch('/api/counter/feedback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        orderId,
-        rating,
-        comment,
-      }),
-    });
+/* ---------------- SUBMIT ---------------- */
 
-    if (!res.ok) {
-      console.error(await res.json());
-      setLoading(false);
-      return;
-    }
+const handleSubmit = async () => {
 
-    setLoading(false);
+if (!orderId) return;
 
-    router.push('/counter/tables');
-  };
+setLoading(true);
 
-  const skipFeedback = async () => {
-    if (!orderId) return;
+const res = await fetch('/api/counter/feedback', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    orderId,
+    rating,
+    comment,
+  }),
+});
 
-    // still close order + free table
-    await fetch('/api/counter/feedback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        orderId,
-        rating: 5,
-        comment: '',
-      }),
-    });
+if (!res.ok) {
+  console.error(await res.json());
+  setLoading(false);
+  return;
+}
 
-    router.push('/counter/tables');
-  };
+router.push('/counter/tables');
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="bg-white shadow-xl rounded-2xl p-8 w-full max-w-md">
-        <h1 className="text-2xl font-bold mb-6 text-center">
-          Customer Feedback
-        </h1>
+};
 
-        <div className="flex justify-center gap-3 mb-6 text-3xl cursor-pointer">
-          {[1, 2, 3, 4, 5].map((star) => (
-            <span
-              key={star}
-              onClick={() => setRating(star)}
-              className={star <= rating ? 'text-yellow-500' : 'text-gray-300'}
-            >
-              ★
-            </span>
-          ))}
-        </div>
+/* ---------------- SKIP ---------------- */
 
-        <textarea
-          placeholder="Optional comment..."
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          className="w-full border rounded-lg p-3 mb-6 resize-none"
-          rows={4}
-        />
+const skipFeedback = async () => {
 
-        <div className="flex flex-col gap-3">
-          <Button
-            onClick={handleSubmit}
-            disabled={loading}
-            className="bg-green-600 text-white py-2 rounded-lg font-semibold"
-          >
-            {loading ? 'Submitting...' : 'Submit Feedback'}
-          </Button>
+if (!orderId) return;
 
-          <Button
-            onClick={skipFeedback}
-            className="bg-gray-200 py-2 rounded-lg"
-          >
-            Skip
-          </Button>
-        </div>
-      </div>
+await fetch('/api/counter/feedback', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    orderId,
+    rating: 5,
+    comment: '',
+  }),
+});
+
+router.push('/counter/tables');
+
+};
+
+/* ---------------- UI ---------------- */
+
+return (
+
+<div className="min-h-screen flex items-center justify-center p-6">
+
+  <div className="border shadow-xl rounded-2xl p-8 w-full max-w-md space-y-6">
+
+    <div className="text-center">
+
+      <h1 className="text-2xl font-bold">
+        How was your experience?
+      </h1>
+
+      <p className="text-sm text-gray-500 mt-1">
+        Your feedback helps us improve
+      </p>
+
     </div>
-  );
+
+    {/* STAR RATING */}
+
+    <div className="flex justify-center gap-3 text-4xl">
+
+      {[1,2,3,4,5].map((star) => (
+
+        <span
+          key={star}
+          onClick={() => setRating(star)}
+          onMouseEnter={() => setHover(star)}
+          onMouseLeave={() => setHover(0)}
+          className={`cursor-pointer transition ${
+            star <= (hover || rating)
+              ? 'text-yellow-500'
+              : 'text-gray-100'
+          }`}
+        >
+          ★
+        </span>
+
+      ))}
+
+    </div>
+
+    {/* COMMENT */}
+
+    <div>
+
+      <label
+        htmlFor="comment"
+        className="block text-sm font-medium mb-2"
+      >
+        Comment (optional)
+      </label>
+
+      <textarea
+        id="comment"
+        placeholder="Tell us what you liked or how we can improve..."
+        value={comment}
+        onChange={(e) => setComment(e.target.value)}
+        className="w-full border rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-green-500"
+        rows={4}
+      />
+
+    </div>
+
+    {/* ACTIONS */}
+
+    <div className="flex flex-col gap-3">
+
+      <Button
+        onClick={handleSubmit}
+        disabled={loading}
+        className="bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700 transition"
+      >
+        {loading ? 'Submitting...' : 'Submit Feedback'}
+      </Button>
+
+      <button
+        onClick={skipFeedback}
+        className="text-sm text-gray-500 hover:underline"
+      >
+        Skip feedback
+      </button>
+
+    </div>
+
+  </div>
+
+</div>
+
+);
+
 }

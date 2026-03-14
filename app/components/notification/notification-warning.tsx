@@ -1,14 +1,28 @@
 import { Notification } from './notification';
+import { HTMLAttributes } from 'react';
+
+interface NotificationWarningProps extends HTMLAttributes<HTMLDivElement> {
+  title?: string;
+}
 
 export function NotificationWarning({
   title = 'Warning',
   children,
-}: {
-  title?: string;
-  children: React.ReactNode;
-}) {
+  className = '',
+  ...props
+}: NotificationWarningProps) {
   return (
-    <Notification title={title} className="border-yellow-700/40 bg-yellow-200">
+    <Notification
+      title={title}
+      icon="⚠️"
+      className={`
+        border-yellow-700/40
+        bg-yellow-200
+        text-yellow-900
+        ${className}
+      `}
+      {...props}
+    >
       {children}
     </Notification>
   );

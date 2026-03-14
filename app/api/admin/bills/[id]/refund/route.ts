@@ -2,65 +2,137 @@ import { NextResponse } from 'next/server';
 import { connectDB } from '@/app/lib/db';
 import Bill from '@/app/lib/models/bill';
 import Order from '@/app/lib/models/order';
+import RefundLog from '@/app/lib/models/refundlog';
+
 import mongoose from 'mongoose';
-import { cookies } from 'next/headers';
-import jwt from 'jsonwebtoken';
+
 import { requireRole } from '@/app/lib/auth/requireRole';
+
+import { cookies } from 'next/headers';
+import { jwtVerify } from 'jose';
 
 export async function POST(
   req: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+
   try {
+
+    /* ---------------- AUTH ---------------- */
+
     await requireRole(['admin']);
-    await connectDB();
 
-    const { id } = await context.params;
-    const { reason } = await req.json();
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json({ error: 'Invalid bill id' }, { status: 400 });
-    }
-
-    // 🔐 Get user from token
     const cookieStore = await cookies();
+
     const token = cookieStore.get('auth_token')?.value;
 
     if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
     }
 
-    const payload: any = jwt.verify(token, process.env.JWT_SECRET!);
+    const secret = new TextEncoder().encode(process.env.JWT_SECRET);
+
+    const { payload } = await jwtVerify(token, secret);
+
+    const userId = payload.userId as string;
+
+    /* ---------------- DB ---------------- */
+
+    await connectDB();
+
+    const { id } = await context.params;
+
+    const { reason } = await req.json();
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { error: 'Invalid bill id' },
+        { status: 400 }
+      );
+    }
 
     const bill = await Bill.findById(id);
 
-    if (!bill || !bill.isPaid) {
-      return NextResponse.json({ error: 'Invalid refund' }, { status: 400 });
+    if (!bill) {
+      return NextResponse.json(
+        { error: 'Bill not found' },
+        { status: 404 }
+      );
+    }
+
+    if (!bill.isPaid) {
+      return NextResponse.json(
+        { error: 'Cannot refund unpaid bill' },
+        { status: 400 }
+      );
     }
 
     if (bill.isRefunded) {
-      return NextResponse.json({ error: 'Already refunded' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Bill already refunded' },
+        { status: 400 }
+      );
     }
 
-    // ✅ Mark refunded
+    /* ---------------- REFUND ---------------- */
+
     bill.isRefunded = true;
+
     bill.refundAt = new Date();
+
     bill.refundReason = reason;
+
     bill.refundAmount = bill.totalAmount;
-    bill.refundedBy = payload.userId;
+
+    bill.refundedBy = new mongoose.Types.ObjectId(userId);
 
     await bill.save();
 
-    // ✅ Update order status
+    /* ---------------- ORDER CLOSE ---------------- */
+
     const order = await Order.findById(bill.orderId);
+
     if (order) {
-      order.status = 'refunded';
+
+      order.status = 'closed';
+
       await order.save();
+
     }
 
-    return NextResponse.json({ success: true });
+    /* ---------------- REFUND LOG ---------------- */
+
+    await RefundLog.create({
+
+      billId: bill._id,
+
+      orderId: bill.orderId,
+
+      amount: bill.totalAmount,
+
+      reason,
+
+      refundedBy: new mongoose.Types.ObjectId(userId),
+
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Refund completed'
+    });
+
   } catch (err: any) {
+
     console.error('Refund Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+
+    return NextResponse.json(
+      { error: err.message },
+      { status: 500 }
+    );
+
   }
+
 }

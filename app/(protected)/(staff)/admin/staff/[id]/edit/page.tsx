@@ -18,5 +18,22 @@ export default async function EditPage({
     _id: user?._id.toString(),
   };
 
-  return <StaffForm initialData={safeUser} isEdit />;
+ 
+  return (
+      <div className="p-4 md:p-8 max-w-3xl mx-auto space-y-6">
+  
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">
+            Edit Staff Member
+          </h1>
+  
+          <p className="text-sm text-gray-500 mt-1">
+            Edit staff account for the restaurant
+          </p>
+        </div>
+  
+        <StaffForm initialData={safeUser} isEdit />
+  
+      </div>
+    );
 }

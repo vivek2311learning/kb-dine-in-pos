@@ -12,19 +12,65 @@ export default function BillDetailPage() {
   const [bill, setBill] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  /* ---------------- FETCH BILL ---------------- */
+
   const fetchBill = async () => {
-    const res = await fetch(`/api/admin/bills/${billId}`);
-    const data = await res.json();
-    setBill(data);
-    setLoading(false);
+    try {
+      const res = await fetch(`/api/admin/bills/${billId}`, {
+        cache: 'no-store',
+      });
+
+      const data = await res.json();
+
+      setBill(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     if (billId) fetchBill();
   }, [billId]);
 
+  /* ---------------- PRINT ---------------- */
+
+  const handlePrint = () => {
+    const content = document.getElementById('bill-print')?.innerHTML;
+
+    if (!content) return;
+
+    const win = window.open('', '', 'width=400,height=600');
+
+    if (!win) return;
+
+    win.document.write(`
+<html>
+<head>
+<title>Bill</title>
+<style>
+body{font-family:sans-serif;padding:20px}
+table{width:100%;border-collapse:collapse}
+td{padding:6px 0}
+.total{font-weight:bold;border-top:1px solid #ccc}
+</style>
+</head>
+<body>
+${content}
+</body>
+</html>
+`);
+
+    win.document.close();
+    win.print();
+  };
+
+  /* ---------------- REFUND ---------------- */
+
   const handleRefund = async () => {
     const reason = prompt('Refund reason?');
+
     if (!reason) return;
 
     await fetch(`/api/admin/bills/${billId}/refund`, {
@@ -36,52 +82,162 @@ export default function BillDetailPage() {
     fetchBill();
   };
 
-  if (loading) return <div className="p-6">Loading...</div>;
-  if (!bill) return <div className="p-6">Bill not found</div>;
+  /* ---------------- STATUS BADGE ---------------- */
+
+  const statusBadge = () => {
+    if (bill.isRefunded)
+      return (
+        <span className="px-3 py-1 text-xs rounded bg-red-100 text-red-600">
+          Refunded
+        </span>
+      );
+
+    if (bill.isPaid)
+      return (
+        <span className="px-3 py-1 text-xs rounded bg-green-100 text-green-600">
+          Paid
+        </span>
+      );
+
+    return (
+      <span className="px-3 py-1 text-xs rounded bg-yellow-100 text-yellow-600">
+        Unpaid
+      </span>
+    );
+  };
+
+  if (loading) return <div className="p-6 text-gray-500">Loading bill...</div>;
+
+  if (!bill) return <div className="p-6 text-gray-500">Bill not found</div>;
+
+  const total =
+    bill.totalAmount ?? bill.subtotal + (bill.tax || 0) - (bill.discount || 0);
+
+  const paymentTotal =
+    bill.payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0;
+
+  /* ---------------- UI ---------------- */
 
   return (
-    <div className="p-8 space-y-6">
-      <h1 className="text-3xl font-bold">Bill #{bill.billNumber}</h1>
+    <div className="p-4 md:p-8 max-w-3xl mx-auto space-y-6">
+      {/* HEADER */}
 
-      <Card className="p-4 space-y-2">
-        <p>Total: ₹{bill.totalAmount}</p>
-        <p>
-          Status:{' '}
-          {bill.isRefunded ? 'Refunded' : bill.isPaid ? 'Paid' : 'Unpaid'}
-        </p>
+      <Card className="p-4 flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold">Bill #{bill.billNumber}</h1>
 
-        {bill.isRefunded && (
-          <>
-            <p>Refunded At: {new Date(bill.refundAt).toLocaleString()}</p>
-            <p>Reason: {bill.refundReason}</p>
-          </>
-        )}
+          <p className="text-xs text-gray-500">
+            {bill.printedAt && new Date(bill.printedAt).toLocaleString()}
+          </p>
+        </div>
+
+        {statusBadge()}
       </Card>
 
-      <Card className="p-4 space-y-2">
-        <h2 className="font-semibold">Items</h2>
-        {bill.items?.map((item: any) => (
-          <div key={item._id} className="flex justify-between">
-            <span>
-              {item.nameSnapshot} x{item.quantity}
-            </span>
-            <span>₹{item.priceSnapshot * item.quantity}</span>
+      {/* PRINT AREA */}
+
+      <div id="bill-print" className="space-y-6">
+        {/* ITEMS */}
+
+        <Card className="p-4">
+          <h2 className="font-semibold text-lg mb-3">Items</h2>
+
+          <div className="space-y-2">
+            {bill.items?.map((item: any) => {
+              const price = item.priceSnapshot * item.quantity;
+
+              return (
+                <div
+                  key={item._id}
+                  className="flex justify-between text-sm border-b pb-1"
+                >
+                  <span>
+                    {item.nameSnapshot} × {item.quantity}
+                  </span>
+
+                  <span className="font-medium">₹{price}</span>
+                </div>
+              );
+            })}
           </div>
-        ))}
-      </Card>
+        </Card>
 
-      <Card className="p-4 space-y-2">
-        <h2 className="font-semibold">Payments</h2>
-        {bill.payments?.map((p: any, i: number) => (
-          <div key={i} className="flex justify-between">
-            <span>{p.method}</span>
-            <span>₹{p.amount}</span>
+        {/* SUMMARY */}
+
+        <Card className="p-4 space-y-2">
+          <div className="flex justify-between text-sm">
+            <span>Subtotal</span>
+            <span>₹{bill.subtotal}</span>
           </div>
-        ))}
-      </Card>
 
-      <div className="flex gap-4">
-        <Button onClick={() => window.print()}>Reprint</Button>
+          {bill.tax > 0 && (
+            <div className="flex justify-between text-sm">
+              <span>Tax</span>
+              <span>₹{bill.tax}</span>
+            </div>
+          )}
+
+          {bill.discount > 0 && (
+            <div className="flex justify-between text-sm">
+              <span>Discount</span>
+              <span>- ₹{bill.discount}</span>
+            </div>
+          )}
+
+          <div className="flex justify-between text-lg font-bold border-t pt-2">
+            <span>Total</span>
+            <span>₹{total}</span>
+          </div>
+
+          {bill.isRefunded && (
+            <div className="text-sm text-red-600 pt-2">
+              <p>Refunded At: {new Date(bill.refundAt).toLocaleString()}</p>
+
+              <p>Reason: {bill.refundReason}</p>
+            </div>
+          )}
+        </Card>
+
+        {/* PAYMENTS */}
+
+        <Card className="p-4">
+          <h2 className="font-semibold text-lg mb-3">Payments</h2>
+
+          {bill.payments?.length === 0 && (
+            <p className="text-sm text-gray-500">No payment</p>
+          )}
+
+          <div className="space-y-2">
+            {bill.payments?.map((p: any, i: number) => {
+              return (
+                <div
+                  key={i}
+                  className="flex justify-between text-sm border-b pb-1"
+                >
+                  <span className="capitalize">{p.method}</span>
+
+                  <span className="font-medium">₹{p.amount}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* PAYMENT TOTAL */}
+
+          {bill.payments?.length > 0 && (
+            <div className="flex justify-between font-semibold text-base border-t pt-3 mt-3">
+              <span>Total Paid</span>
+
+              <span>₹{paymentTotal}</span>
+            </div>
+          )}
+        </Card>
+      </div>
+
+      {/* ACTIONS */}
+
+      <div className="flex flex-wrap gap-3">
+        <Button onClick={handlePrint}>Reprint Bill</Button>
 
         {!bill.isRefunded && bill.isPaid && (
           <Button className="bg-red-600 text-white" onClick={handleRefund}>

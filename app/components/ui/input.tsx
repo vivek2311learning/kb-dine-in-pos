@@ -1,38 +1,52 @@
-import { InputHTMLAttributes, forwardRef } from 'react';
+import { InputHTMLAttributes, forwardRef, ReactNode, useId } from "react"
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
-  label?: string;
-  error?: string;
+  label?: ReactNode
+  error?: string
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, className = '', ...props }, ref) => {
+  ({ label, error, className = "", id, disabled, ...props }, ref) => {
+
+    const generatedId = useId()
+    const inputId = id || generatedId
+
     return (
-      <div className="space-y-1">
+      <div className="space-y-1.5">
+
         {label && (
-          <label className="block font-rustic text-sm text-[#3b2a1a]">
+          <label
+            htmlFor={inputId}
+            className="block font-rustic text-sm text-[#3b2a1a]"
+          >
             {label}
           </label>
         )}
 
         <input
           ref={ref}
+          id={inputId}
+          disabled={disabled}
           {...props}
           className={`
             w-full
             px-4 py-2
             rounded-lg
 
-            bg-[#f5efe6]
+            bg-[#f5dbb4]
             text-[#3b2a1a]
             placeholder:text-[#3b2a1a]/50
 
             border
-            border-[#3b2a1a]/30
+            ${error ? "border-red-600" : "border-[#3b2a1a]/30"}
+
             focus:border-[#3b2a1a]
             focus:outline-none
 
             shadow-[inset_0_1px_2px_rgba(0,0,0,0.15)]
+
+            disabled:opacity-60
+            disabled:cursor-not-allowed
 
             transition-colors
             duration-150
@@ -41,10 +55,15 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           `}
         />
 
-        {error && <p className="text-xs text-red-700 font-medium">{error}</p>}
-      </div>
-    );
-  },
-);
+        {error && (
+          <p className="text-xs text-red-700 font-medium">
+            {error}
+          </p>
+        )}
 
-Input.displayName = 'Input';
+      </div>
+    )
+  }
+)
+
+Input.displayName = "Input"

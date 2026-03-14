@@ -2,15 +2,35 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/app/components/ui/button';
 
-export default function StaffForm({ initialData, isEdit = false }: any) {
+import { Card } from '@/app/components/ui/card';
+import { Button } from '@/app/components/ui/button';
+import { Input } from '@/app/components/ui/input';
+import { Select } from '@/app/components/ui/select';
+
+type Role = 'admin' | 'counter' | 'kitchen';
+
+interface Staff {
+  _id?: string;
+  name: string;
+  email?: string;
+  role: Role;
+}
+
+interface Props {
+  initialData?: Staff;
+  isEdit?: boolean;
+}
+
+export default function StaffForm({ initialData, isEdit = false }: Props) {
   const router = useRouter();
 
   const [name, setName] = useState(initialData?.name || '');
   const [email, setEmail] = useState(initialData?.email || '');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState(initialData?.role || 'counter');
+  const [role, setRole] = useState<Role>(initialData?.role || 'counter');
+
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,88 +50,90 @@ export default function StaffForm({ initialData, isEdit = false }: any) {
     }
 
     const url = isEdit
-      ? `/api/admin/staff/${initialData._id}`
+      ? `/api/admin/staff/${initialData?._id}`
       : '/api/admin/staff';
 
     const method = isEdit ? 'PATCH' : 'POST';
 
-    await fetch(url, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
+    try {
+      setLoading(true);
 
-    router.push('/admin/staff');
+      await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      router.push('/admin/staff');
+      router.refresh();
+    } catch (error) {
+      console.error('Staff save failed', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 p-8 max-w-md">
-      <div>
-        <label htmlFor="name" className="block mb-1 text-sm font-medium">
-          Name
-        </label>
+    <Card padding="lg" className="max-w-md mx-auto space-y-6">
+      <h1 className="text-2xl font-rustic">
+        {isEdit ? 'Edit Staff Member' : 'Create Staff Member'}
+      </h1>
 
-        <input
-          id="name"
-          type="text"
-          className="border p-2 w-full rounded"
+      <form onSubmit={handleSubmit} className="space-y-4">
+
+        <Input
+          label="Name"
           value={name}
+          placeholder="Staff name"
           onChange={(e) => setName(e.target.value)}
         />
-      </div>
 
-      {!isEdit && (
-        <div>
-          <label htmlFor="email" className="block mb-1 text-sm font-medium">
-            Email
-          </label>
-
-          <input
-            id="email"
+        {!isEdit && (
+          <Input
+            label="Email"
             type="email"
-            className="border p-2 w-full rounded"
             value={email}
+            placeholder="email@example.com"
             onChange={(e) => setEmail(e.target.value)}
           />
-        </div>
-      )}
+        )}
 
-      <div>
-        <label htmlFor="password" className="block mb-1">
-          Password
-        </label>
-        <input
-          id="password"
+        <Input
+          label="Password"
           type="password"
-          className="border p-2 w-full rounded"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          placeholder={isEdit ? 'Leave empty to keep current password' : ''}
           required={!isEdit}
+          onChange={(e) => setPassword(e.target.value)}
         />
-      </div>
 
-      <div>
-        <label htmlFor="role" className="block mb-1 text-sm font-medium">
-          Role
-        </label>
-
-        <select
-          id="role"
-          className="border p-2 w-full rounded"
+        <Select
+          label="Role"
           value={role}
           onChange={(e) =>
-            setRole(e.target.value as 'admin' | 'counter' | 'kitchen')
+            setRole(e.target.value as Role)
           }
         >
           <option value="admin">Admin</option>
           <option value="counter">Counter</option>
           <option value="kitchen">Kitchen</option>
-        </select>
-      </div>
+        </Select>
 
-      <Button type="submit">{isEdit ? 'Update Staff' : 'Create Staff'}</Button>
-    </form>
+        <Button
+          type="submit"
+          disabled={loading}
+          className="w-full"
+        >
+          {loading
+            ? 'Saving...'
+            : isEdit
+            ? 'Update Staff'
+            : 'Create Staff'}
+        </Button>
+
+      </form>
+    </Card>
   );
 }

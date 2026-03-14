@@ -8,11 +8,27 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <>
-      <Toaster position="top-center" />
+    <div className="flex min-h-screen flex-col">
+
+      {/* Notifications */}
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          duration: 4000,
+        }}
+      />
+
+      {/* Header */}
       <Header />
-      {children}
+
+      {/* Page Content */}
+      <main className="flex-1">
+        {children}
+      </main>
+
+      {/* Footer */}
       <Footer />
-    </>
+
+    </div>
   );
 }

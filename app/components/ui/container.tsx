@@ -1,14 +1,18 @@
-import { HTMLAttributes } from 'react';
+import { HTMLAttributes, ReactNode, ElementType } from 'react';
 
-interface ContainerProps extends HTMLAttributes<HTMLDivElement> {}
+interface ContainerProps extends HTMLAttributes<HTMLElement> {
+  children: ReactNode;
+  as?: ElementType;
+}
 
 export function Container({
   children,
   className = '',
+  as: Component = 'div',
   ...props
 }: ContainerProps) {
   return (
-    <div
+    <Component
       {...props}
       className={`
         mx-auto
@@ -17,11 +21,10 @@ export function Container({
         px-4
         md:px-6
         lg:px-8
-
         ${className}
       `}
     >
       {children}
-    </div>
+    </Component>
   );
 }

@@ -1,6 +1,13 @@
 'use client';
 
-import { createContext, useContext, useRef, useState } from 'react';
+import {
+  createContext,
+  useContext,
+  useRef,
+  useState,
+  useCallback,
+} from 'react';
+
 import { Notification } from './notification';
 import { NotificationSuccess } from './notification-success';
 import { NotificationError } from './notification-error';
@@ -10,6 +17,7 @@ import { NotificationInfo } from './notification-info';
 type NotificationType = 'success' | 'error' | 'warning' | 'info';
 
 interface NotificationState {
+  id: number;
   type: NotificationType;
   title?: string;
   message: string;
@@ -26,31 +34,35 @@ export function NotificationProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const [notification, setNotification] = useState<NotificationState | null>(
-    null,
-  );
+  const [notifications, setNotifications] = useState<NotificationState[]>([]);
+  const idRef = useRef(0);
 
-  // ✅ FIX: store timeout reference
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const show = (type: NotificationType, message: string, title?: string) => {
-    // ❌ clear old timeout
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-
-    setNotification({ type, message, title });
-
-    // ✅ new timeout
-    timeoutRef.current = setTimeout(() => {
-      setNotification(null);
-      timeoutRef.current = null;
-    }, 5000); // 👈 now this ACTUALLY works
+  const remove = (id: number) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
   };
 
-  const renderNotification = () => {
-    if (!notification) return null;
+  const show = useCallback(
+    (type: NotificationType, message: string, title?: string) => {
+      const id = ++idRef.current;
 
+      setNotifications((prev) => [
+        ...prev,
+        {
+          id,
+          type,
+          message,
+          title,
+        },
+      ]);
+
+      setTimeout(() => {
+        remove(id);
+      }, 5000);
+    },
+    [],
+  );
+
+  const renderNotification = (notification: NotificationState) => {
     const props = {
       title: notification.title,
       children: notification.message,
@@ -74,17 +86,23 @@ export function NotificationProvider({
     <NotificationContext.Provider value={{ show }}>
       {children}
 
-      {notification && (
-        <div className="fixed top-6 right-6 z-50">{renderNotification()}</div>
-      )}
+      <div className="fixed top-6 right-6 z-50 space-y-3">
+        {notifications.map((notification) => (
+          <div key={notification.id}>
+            {renderNotification(notification)}
+          </div>
+        ))}
+      </div>
     </NotificationContext.Provider>
   );
 }
 
 export function useNotification() {
   const ctx = useContext(NotificationContext);
+
   if (!ctx) {
     throw new Error('useNotification must be used inside NotificationProvider');
   }
+
   return ctx;
 }

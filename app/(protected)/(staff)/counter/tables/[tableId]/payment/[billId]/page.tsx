@@ -6,135 +6,192 @@ import { useEffect, useState } from 'react';
 type PaymentMethod = 'cash' | 'upi' | 'card';
 
 interface PaymentRow {
-  method: PaymentMethod;
-  amount: number;
+method: PaymentMethod;
+amount: number;
 }
 
 export default function PaymentPage() {
-  const params = useParams();
-  const router = useRouter();
 
-  const billId = params.billId as string;
-  const tableId = params.tableId as string;
+const params = useParams<{ billId: string; tableId: string }>();
+const router = useRouter();
 
-  const [totalAmount, setTotalAmount] = useState<number>(0);
-  const [payments, setPayments] = useState<PaymentRow[]>([
-    { method: 'cash', amount: 0 },
-  ]);
-  const [loading, setLoading] = useState(false);
+const billId = params.billId;
+const tableId = params.tableId;
 
-  /* ---------------- FETCH BILL ---------------- */
+const [totalAmount, setTotalAmount] = useState(0);
 
-  useEffect(() => {
-    if (!billId) return;
+const [payments, setPayments] = useState<PaymentRow[]>([
+{ method: 'cash', amount: 0 },
+]);
 
-    const fetchBill = async () => {
-      const res = await fetch(`/api/counter/bills/${billId}`);
-      const data = await res.json();
+const [loading, setLoading] = useState(false);
 
-      if (res.ok && data?.bill?.totalAmount) {
-        setTotalAmount(data.bill.totalAmount);
-        setPayments([{ method: 'cash', amount: data.bill.totalAmount }]);
-      }
-    };
+/* ---------------- FETCH BILL ---------------- */
 
-    fetchBill();
-  }, [billId]);
+useEffect(() => {
 
-  /* ---------------- CALCULATIONS ---------------- */
+if (!billId) return;
 
-  const paidAmount = payments.reduce((sum, p) => sum + Number(p.amount), 0);
+const fetchBill = async () => {
 
-  const remaining = totalAmount - paidAmount;
+  const res = await fetch(`/api/counter/bills/${billId}`);
+  const data = await res.json();
 
-  /* ---------------- UPDATE FUNCTIONS ---------------- */
+  if (res.ok && data?.bill?.totalAmount) {
 
-  const updateMethod = (index: number, value: PaymentMethod) => {
-    const updated = [...payments];
-    updated[index].method = value;
-    setPayments(updated);
-  };
+    setTotalAmount(data.bill.totalAmount);
 
-  const updateAmount = (index: number, value: number) => {
-    const updated = [...payments];
-    updated[index].amount = value;
-    setPayments(updated);
-  };
+    setPayments([
+      { method: 'cash', amount: data.bill.totalAmount }
+    ]);
 
-  const addPaymentRow = () => {
-    setPayments([...payments, { method: 'cash', amount: 0 }]);
-  };
+  }
 
-  /* ---------------- COMPLETE PAYMENT ---------------- */
+};
 
-  const handlePayment = async () => {
-    if (!billId) return;
+fetchBill();
 
-    if (remaining !== 0) {
-      alert('Payment total mismatch');
-      return;
-    }
+}, [billId]);
 
-    setLoading(true);
+/* ---------------- CALCULATIONS ---------------- */
 
-    const res = await fetch(`/api/counter/bills/${billId}/pay`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        payments,
-      }),
-    });
+const paidAmount = payments.reduce(
+(sum, p) => sum + Number(p.amount || 0),
+0
+);
 
-    const data = await res.json();
+const remaining = totalAmount - paidAmount;
 
-    if (!res.ok) {
-      alert(data.error);
-      setLoading(false);
-      return;
-    }
+/* ---------------- UPDATE FUNCTIONS ---------------- */
 
-    // 🔥 Get bill again to extract orderId
-    const billRes = await fetch(`/api/counter/bills/${billId}`);
-    const billData = await billRes.json();
+const updateMethod = (index: number, value: PaymentMethod) => {
 
-    const orderId = billData?.bill?.orderId;
+const updated = [...payments];
+updated[index].method = value;
 
-    setLoading(false);
+setPayments(updated);
 
-    if (!orderId) {
-      alert('Order not found');
-      return;
-    }
+};
 
-    router.push(`/counter/tables/${tableId}/feedback/${orderId}`);
-  };
+const updateAmount = (index: number, value: number) => {
 
-  /* ---------------- UI ---------------- */
+const updated = [...payments];
+updated[index].amount = value;
 
-  return (
-    <div className="p-6 max-w-md mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Payment</h1>
+setPayments(updated);
 
-      <div className="mb-4 text-lg font-semibold">Total: ₹{totalAmount}</div>
+};
 
-      {payments.map((p, i) => (
-        <div key={i} className="mb-4 border p-4 rounded">
-          <label htmlFor={`method-${i}`} className="block mb-1 font-medium">
-            Payment Method
+const addPaymentRow = () => {
+
+setPayments([
+  ...payments,
+  { method: 'cash', amount: 0 }
+]);
+
+};
+
+/* ---------------- COMPLETE PAYMENT ---------------- */
+
+const handlePayment = async () => {
+
+if (!billId) return;
+
+if (remaining !== 0) {
+  alert('Payment total mismatch');
+  return;
+}
+
+setLoading(true);
+
+const res = await fetch(`/api/counter/bills/${billId}/pay`, {
+  method: 'PATCH',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ payments }),
+});
+
+const data = await res.json();
+
+if (!res.ok) {
+  alert(data.error);
+  setLoading(false);
+  return;
+}
+
+const billRes = await fetch(`/api/counter/bills/${billId}`);
+const billData = await billRes.json();
+
+const orderId = billData?.bill?.orderId;
+
+setLoading(false);
+
+if (!orderId) {
+  alert('Order not found');
+  return;
+}
+
+router.push(`/counter/tables/${tableId}/feedback/${orderId}`);
+
+};
+
+/* ---------------- UI ---------------- */
+
+return (
+<div className="p-8 max-w-xl mx-auto space-y-6">
+
+  <h1 className="text-3xl font-bold text-center">
+    Payment
+  </h1>
+
+  {/* TOTAL CARD */}
+
+  <div className="border rounded-xl p-6 text-center">
+
+    <p className="text-sm">
+      Total Amount
+    </p>
+
+    <p className="text-3xl font-bold mt-1">
+      ₹{totalAmount}
+    </p>
+
+  </div>
+
+  {/* PAYMENT ROWS */}
+
+  <div className="space-y-4">
+
+    {payments.map((p, i) => (
+
+      <div
+        key={i}
+        className="border rounded-xl p-4 grid grid-cols-2 gap-4"
+      >
+
+        <div>
+
+          <label className="text-sm font-medium" htmlFor={`method-${i}`}>
+            Method
           </label>
 
           <select
             id={`method-${i}`}
             value={p.method}
-            onChange={(e) => updateMethod(i, e.target.value as PaymentMethod)}
-            className="border p-2 w-full mb-3 rounded"
+            onChange={(e) =>
+              updateMethod(i, e.target.value as PaymentMethod)
+            }
+            className="border rounded-lg p-2 w-full mt-1"
           >
             <option value="cash">Cash</option>
             <option value="upi">UPI</option>
             <option value="card">Card</option>
           </select>
 
-          <label htmlFor={`amount-${i}`} className="block mb-1 font-medium">
+        </div>
+
+        <div>
+
+          <label className="text-sm font-medium" htmlFor={`amount-${i}`}>
             Amount
           </label>
 
@@ -142,30 +199,64 @@ export default function PaymentPage() {
             id={`amount-${i}`}
             type="number"
             value={p.amount}
-            onChange={(e) => updateAmount(i, Number(e.target.value))}
-            className="border p-2 w-full rounded"
+            onChange={(e) =>
+              updateAmount(i, Number(e.target.value))
+            }
+            className="border rounded-lg p-2 w-full mt-1"
           />
+
         </div>
-      ))}
 
-      <button
-        onClick={addPaymentRow}
-        className="mb-4 bg-gray-200 px-4 py-2 rounded w-full"
-      >
-        + Add Split Payment
-      </button>
+      </div>
 
-      <div className="mb-2">Paid: ₹{paidAmount}</div>
+    ))}
 
-      <div className="mb-4 font-semibold">Remaining: ₹{remaining}</div>
+  </div>
 
-      <button
-        onClick={handlePayment}
-        disabled={loading || remaining !== 0}
-        className="bg-green-600 text-white px-6 py-2 rounded w-full"
-      >
-        {loading ? 'Processing...' : 'Complete Payment'}
-      </button>
+  {/* ADD SPLIT */}
+
+  <button
+    onClick={addPaymentRow}
+    className="w-full py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
+  >
+    + Add Split Payment
+  </button>
+
+  {/* SUMMARY */}
+
+  <div className="border rounded-xl p-4 space-y-2">
+
+    <div className="flex justify-between">
+      <span>Paid</span>
+      <span>₹{paidAmount}</span>
     </div>
-  );
+
+    <div className="flex justify-between font-semibold text-lg">
+
+      <span>Remaining</span>
+
+      <span className={remaining === 0 ? 'text-green-600' : 'text-red-600'}>
+        ₹{remaining}
+      </span>
+
+    </div>
+
+  </div>
+
+  {/* COMPLETE PAYMENT */}
+
+  <button
+    onClick={handlePayment}
+    disabled={loading || remaining !== 0}
+    className="w-full py-3 bg-green-600 text-white rounded-xl text-lg font-semibold hover:bg-green-700 transition"
+  >
+
+    {loading ? 'Processing...' : 'Complete Payment'}
+
+  </button>
+
+</div>
+
+);
+
 }

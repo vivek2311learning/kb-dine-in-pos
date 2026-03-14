@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+
 import { Card } from '@/app/components/ui/card';
 import { Badge } from '@/app/components/ui/badge';
 
@@ -13,21 +14,29 @@ interface Table {
 }
 
 export default function TablesPage() {
+  const router = useRouter();
+
   const [tables, setTables] = useState<Table[]>([]);
   const [loading, setLoading] = useState(true);
 
-  /* prevent double click */
   const [processing, setProcessing] = useState(false);
-
-  const router = useRouter();
 
   /* ================= FETCH TABLES ================= */
 
   const fetchTables = async () => {
-    const res = await fetch('/api/counter/tables');
-    const data = await res.json();
-    setTables(data);
-    setLoading(false);
+    try {
+      const res = await fetch('/api/counter/tables');
+
+      if (!res.ok) throw new Error('Failed to fetch tables');
+
+      const data = await res.json();
+
+      setTables(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -57,19 +66,17 @@ export default function TablesPage() {
 
         if (!res.ok) {
           const text = await res.text();
-          console.log('ERROR RESPONSE:', text);
-          setProcessing(false);
+          console.error('Order creation error:', text);
           return;
         }
 
         const order = await res.json();
 
-        /* update tables instantly */
         await fetchTables();
 
-        /* open order page */
-
-        router.push(`/counter/tables/${table._id}/order?orderId=${order._id}`);
+        router.push(
+          `/counter/tables/${table._id}/order?orderId=${order._id}`
+        );
 
         return;
       }
@@ -78,7 +85,7 @@ export default function TablesPage() {
 
       if (table.currentOrderId) {
         router.push(
-          `/counter/tables/${table._id}/order?orderId=${table.currentOrderId}`,
+          `/counter/tables/${table._id}/order?orderId=${table.currentOrderId}`
         );
       }
     } finally {
@@ -89,19 +96,32 @@ export default function TablesPage() {
   /* ================= UI ================= */
 
   if (loading) {
-    return <div className="p-6 text-center">Loading tables...</div>;
+    return (
+      <div className="p-6 text-center text-gray-500">
+        Loading tables...
+      </div>
+    );
   }
 
   if (!tables.length) {
-    return <div className="p-6 text-center">No tables found</div>;
+    return (
+      <div className="p-6 text-center text-gray-500">
+        No tables found
+      </div>
+    );
   }
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">Tables Overview</h1>
+
+      <h1 className="text-2xl font-bold mb-6">
+        Tables Overview
+      </h1>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+
         {tables.map((table) => (
+
           <Card
             key={table._id}
             onClick={() => handleClick(table)}
@@ -118,14 +138,21 @@ export default function TablesPage() {
               }
             `}
           >
+
             <h2 className="text-xl font-bold mb-2">
               Table {table.tableNumber}
             </h2>
 
-            <Badge>{table.status === 'free' ? 'Free' : 'Occupied'}</Badge>
+            <Badge>
+              {table.status === 'free' ? 'Free' : 'Occupied'}
+            </Badge>
+
           </Card>
+
         ))}
+
       </div>
+
     </div>
   );
 }

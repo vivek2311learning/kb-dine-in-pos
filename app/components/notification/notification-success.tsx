@@ -1,14 +1,28 @@
 import { Notification } from './notification';
+import { HTMLAttributes } from 'react';
+
+interface NotificationSuccessProps extends HTMLAttributes<HTMLDivElement> {
+  title?: string;
+}
 
 export function NotificationSuccess({
   title = 'Success',
   children,
-}: {
-  title?: string;
-  children: React.ReactNode;
-}) {
+  className = '',
+  ...props
+}: NotificationSuccessProps) {
   return (
-    <Notification title={title} className="border-green-700/40 bg-green-200">
+    <Notification
+      title={title}
+      icon="✅"
+      className={`
+        border-green-700/40
+        bg-green-200
+        text-green-900
+        ${className}
+      `}
+      {...props}
+    >
       {children}
     </Notification>
   );
