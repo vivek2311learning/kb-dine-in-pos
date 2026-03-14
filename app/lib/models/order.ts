@@ -4,6 +4,7 @@ import { OrderStatus } from '@/types/enums';
 export interface IOrder extends Document {
   tableId: mongoose.Types.ObjectId;
   status: OrderStatus;
+  openedAt: Date;
   closedAt?: Date;
   closedReason?: 'completed' | 'abandoned';
   createdAt: Date;
@@ -24,6 +25,11 @@ const OrderSchema = new Schema<IOrder>(
       enum: ['running', 'billed', 'paid', 'closed'],
       default: 'running',
       index: true,
+    },
+
+    openedAt: {
+      type: Date,
+      default: Date.now,
     },
 
     // Only when order ends
