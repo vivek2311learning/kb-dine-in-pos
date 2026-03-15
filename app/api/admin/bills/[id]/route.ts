@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/app/lib/db';
 import Bill from '@/app/lib/models/bill';
@@ -10,7 +11,6 @@ export async function GET(
   req: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-
   await requireRole(['admin']);
   await connectDB();
 
@@ -46,7 +46,6 @@ export async function GET(
   /* ---------- FINAL RESPONSE ---------- */
 
   return NextResponse.json({
-
     billNumber: bill.billNumber,
 
     totalAmount: bill.totalAmount,
@@ -71,8 +70,6 @@ export async function GET(
 
     items,
 
-    payments
-
+    payments,
   });
-
 }

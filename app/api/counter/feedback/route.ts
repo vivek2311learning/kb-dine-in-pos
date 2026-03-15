@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import Feedback from '@/app/lib/models/Feedback';
 import Order from '@/app/lib/models/order';

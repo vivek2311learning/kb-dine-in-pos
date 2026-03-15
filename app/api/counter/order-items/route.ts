@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/app/lib/db';
 import OrderItem from '@/app/lib/models/orderItem';

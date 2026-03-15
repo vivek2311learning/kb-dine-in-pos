@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/app/lib/db';
 import Order from '@/app/lib/models/order';
@@ -10,70 +11,56 @@ export async function PATCH(
   req: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-
   try {
-
-    await requireRole(['counter','admin']);
+    await requireRole(['counter', 'admin']);
     await connectDB();
 
     const { id } = await context.params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json(
-        { error: 'Invalid order id' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Invalid order id' }, { status: 400 });
     }
 
     const order = await Order.findById(id);
 
     if (!order) {
-      return NextResponse.json(
-        { error: 'Order not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
     /* ---------------- FIND ITEMS ---------------- */
 
     const items = await OrderItem.find({
       orderId: id,
-      cancelled: false
+      cancelled: false,
     });
 
     /* ---------------- SERVED CHECK ---------------- */
 
-    const servedItems = items.filter(i => i.served);
+    const servedItems = items.filter((i) => i.served);
 
     if (servedItems.length > 0) {
       return NextResponse.json(
         { error: 'Cannot close order. Items already served.' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     /* ---------------- HANDLE ITEMS ---------------- */
 
     for (const item of items) {
-
       // READY BUT NOT SERVED → WASTAGE
       if (item.kitchenStatus === 'ready' && !item.served) {
-
         item.wasted = true;
         item.billable = false;
-
       }
 
       // NOT READY → CANCEL
       else {
-
         item.cancelled = true;
         item.billable = false;
-
       }
 
       await item.save();
-
     }
 
     /* ---------------- CLOSE ORDER ---------------- */
@@ -85,25 +72,18 @@ export async function PATCH(
 
     /* ---------------- FREE TABLE ---------------- */
 
-    await Table.findByIdAndUpdate(order.tableId,{
-      status:'free',
-      currentOrderId:null
+    await Table.findByIdAndUpdate(order.tableId, {
+      status: 'free',
+      currentOrderId: null,
     });
 
     return NextResponse.json({
-      success:true,
-      message:'Table freed successfully'
+      success: true,
+      message: 'Table freed successfully',
     });
+  } catch (err: any) {
+    console.error('Force Close Error:', err);
 
-  } catch(err:any){
-
-    console.error('Force Close Error:',err);
-
-    return NextResponse.json(
-      { error:err.message },
-      { status:500 }
-    );
-
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
-
 }

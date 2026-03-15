@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 import { Loader } from '@/app/components/ui/loader';
@@ -18,7 +18,9 @@ function redirectByRole(router: any, role: Role) {
   if (role === 'kitchen') router.replace('/kitchen/orders');
 }
 
-export default function LoginPage() {
+/* ---------------- LOGIN FORM ---------------- */
+
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { show } = useNotification();
@@ -90,19 +92,13 @@ export default function LoginPage() {
       }
 
       redirectByRole(router, data.role);
-
     } catch (err: unknown) {
-
-      const message =
-        err instanceof Error ? err.message : 'Login failed';
+      const message = err instanceof Error ? err.message : 'Login failed';
 
       show('error', message, 'Login Failed');
       setError(message);
-
     } finally {
-
       setLoading(false);
-
     }
   };
 
@@ -110,21 +106,15 @@ export default function LoginPage() {
 
   return (
     <Container className="py-20">
-
       <div className="max-w-md mx-auto">
-
         <Card className="p-6">
-
           <div className="text-center mb-6">
-
             <h1 className="font-rustic text-3xl text-[#3b2a1a]">
               Welcome Back
             </h1>
-
           </div>
 
           <form className="space-y-4" onSubmit={handleSubmit}>
-
             <Input
               label="Email"
               type="email"
@@ -154,7 +144,6 @@ export default function LoginPage() {
               className="w-full py-3 flex items-center justify-center gap-2"
               disabled={loading}
             >
-
               {loading ? (
                 <>
                   <Loader size="sm" />
@@ -163,15 +152,20 @@ export default function LoginPage() {
               ) : (
                 'Login'
               )}
-
             </Button>
-
           </form>
-
         </Card>
-
       </div>
-
     </Container>
+  );
+}
+
+/* ---------------- PAGE ---------------- */
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="p-10 text-center">Loading...</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }

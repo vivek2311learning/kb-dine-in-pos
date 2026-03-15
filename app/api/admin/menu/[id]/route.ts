@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/app/lib/db';
 import MenuItem from '@/app/lib/models/MenuItem';
@@ -6,11 +7,9 @@ import { requireRole } from '@/app/lib/auth/requireRole';
 
 export async function PATCH(
   req: Request,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
-
   try {
-
     await requireRole(['admin']);
 
     await connectDB();
@@ -20,7 +19,7 @@ export async function PATCH(
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: 'Invalid menu item id' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -31,16 +30,14 @@ export async function PATCH(
     if (!item) {
       return NextResponse.json(
         { error: 'Menu item not found' },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     /* ================= STATUS ACTIONS ================= */
 
     if (body.action) {
-
       switch (body.action) {
-
         case 'activate':
           item.status = 'active';
           item.archivedAt = undefined;
@@ -58,56 +55,40 @@ export async function PATCH(
         default:
           return NextResponse.json(
             { error: 'Invalid action' },
-            { status: 400 }
+            { status: 400 },
           );
-
       }
 
       await item.save();
 
       return NextResponse.json({
         success: true,
-        item
+        item,
       });
-
     }
 
     /* ================= NORMAL UPDATE ================= */
 
-    const updated = await MenuItem.findByIdAndUpdate(
-      id,
-      body,
-      { new: true }
-    );
+    const updated = await MenuItem.findByIdAndUpdate(id, body, { new: true });
 
     return NextResponse.json({
       success: true,
-      item: updated
+      item: updated,
     });
-
   } catch (err: any) {
-
     console.error('Menu Update Error:', err);
 
-    return NextResponse.json(
-      { error: err.message },
-      { status: 500 }
-    );
-
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
-
 }
-
 
 /* ================= DELETE ================= */
 
 export async function DELETE(
   req: Request,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
-
   try {
-
     await requireRole(['admin']);
 
     await connectDB();
@@ -117,25 +98,18 @@ export async function DELETE(
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: 'Invalid menu item id' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     await MenuItem.findByIdAndDelete(id);
 
     return NextResponse.json({
-      success: true
+      success: true,
     });
-
   } catch (err: any) {
-
     console.error('Menu Delete Error:', err);
 
-    return NextResponse.json(
-      { error: err.message },
-      { status: 500 }
-    );
-
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
-
 }
