@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/app/lib/db';
 import MenuItem from '@/app/lib/models/MenuItem';
@@ -11,7 +12,6 @@ export async function PATCH(
 ) {
   try {
     await requireRole(['admin']);
-
     await connectDB();
 
     const { id } = await context.params;
@@ -34,7 +34,7 @@ export async function PATCH(
       );
     }
 
-    /* ================= STATUS ACTIONS ================= */
+    /* STATUS ACTIONS */
 
     if (body.action) {
       switch (body.action) {
@@ -67,7 +67,7 @@ export async function PATCH(
       });
     }
 
-    /* ================= NORMAL UPDATE ================= */
+    /* NORMAL UPDATE */
 
     const updated = await MenuItem.findByIdAndUpdate(id, body, { new: true });
 
@@ -75,14 +75,15 @@ export async function PATCH(
       success: true,
       item: updated,
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error('Menu Update Error:', err);
 
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to update menu item' },
+      { status: 500 },
+    );
   }
 }
-
-/* ================= DELETE ================= */
 
 export async function DELETE(
   req: Request,
@@ -90,7 +91,6 @@ export async function DELETE(
 ) {
   try {
     await requireRole(['admin']);
-
     await connectDB();
 
     const { id } = await context.params;
@@ -102,14 +102,21 @@ export async function DELETE(
       );
     }
 
-    await MenuItem.findByIdAndDelete(id);
+    const result = await MenuItem.deleteOne({ _id: id });
+
+    if (!result.deletedCount) {
+      return NextResponse.json({ error: 'Item not deleted' }, { status: 400 });
+    }
 
     return NextResponse.json({
       success: true,
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error('Menu Delete Error:', err);
 
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to delete menu item' },
+      { status: 500 },
+    );
   }
 }

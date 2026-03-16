@@ -1,183 +1,188 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
 
-interface Item {
+import { Card } from '@/app/components/ui/card';
+import { Button } from '@/app/components/ui/button';
+import { Input } from '@/app/components/ui/input';
+import { useNotification } from '@/app/components/notification/provider';
+
+interface OrderItem {
   _id: string;
   nameSnapshot: string;
+  priceSnapshot: number;
   quantity: number;
   kitchenStatus: string;
-
-  cancelled?: boolean
-  wasted?: boolean
-
-  tableId: {
-    _id: string;
-    tableNumber: number;
-  };
+  served: boolean;
+  cancelled?: boolean;
 }
 
-export default function CounterOrdersPage() {
+interface MenuItem {
+  _id: string;
+  name: string;
+  price: number;
+  category: string;
+}
 
-  const [items, setItems] = useState<Item[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function OrderPage() {
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
-  /* ---------------- FETCH ITEMS ---------------- */
+  const tableId = params.tableId as string;
+  const orderId = searchParams.get('orderId');
 
-  const fetchItems = async () => {
+  const { show } = useNotification();
 
-    try {
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
 
-      const res = await fetch('/api/kitchen/orders', {
-        cache: 'no-store'
-      });
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('');
 
-      if (!res.ok) throw new Error('Failed to fetch');
+  const fetchOrder = async () => {
+    if (!orderId) return;
 
-      const data = await res.json();
+    const res = await fetch(`/api/counter/orders/${orderId}`, {
+      cache: 'no-store',
+    });
 
-      const visibleItems = data.filter(
-  (i: Item) =>
-    !i.cancelled &&
-    !i.wasted &&
-    i.kitchenStatus?.toLowerCase() !== 'draft' &&
-    i.kitchenStatus?.toLowerCase() !== 'served'
-);
+    const data = await res.json();
 
-      /* ready items top */
+    const visible = (data.items || []).filter((i: OrderItem) => !i.cancelled);
 
-      visibleItems.sort((a: Item, b: Item) => {
+    setOrderItems(visible);
+  };
 
-        if (a.kitchenStatus === 'ready') return -1;
-        if (b.kitchenStatus === 'ready') return 1;
+  const fetchMenu = async () => {
+    const res = await fetch('/api/menu', { cache: 'no-store' });
+    const data = await res.json();
 
-        return 0;
+    setMenuItems(data);
 
-      });
-
-      setItems(visibleItems);
-
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
+    if (data.length && !category) {
+      setCategory(data[0].category);
     }
-
   };
 
   useEffect(() => {
-
-    fetchItems();
-
-    const interval = setInterval(fetchItems, 3000);
-
-    return () => clearInterval(interval);
-
+    fetchMenu();
   }, []);
 
-  /* ---------------- STATUS COLOR ---------------- */
+  useEffect(() => {
+    if (!orderId) return;
 
-  const statusColor = (status: string) => {
+    fetchOrder();
 
-    const s = status?.toLowerCase();
+    const interval = setInterval(fetchOrder, 5000);
 
-    switch (s) {
+    return () => clearInterval(interval);
+  }, [orderId]);
 
-      case 'pending':
-        return 'bg-yellow-500';
+  const addItem = async (item: MenuItem) => {
+    if (!orderId) return;
 
-      case 'preparing':
-        return 'bg-blue-600';
+    await fetch(`/api/counter/orders/${orderId}/add`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ menuItemId: item._id }),
+    });
 
-      case 'ready':
-        return 'bg-green-600';
-
-      default:
-        return 'bg-gray-400';
-
-    }
-
+    fetchOrder();
   };
 
-  /* ---------------- UI ---------------- */
+  const categories = [...new Set(menuItems.map((i) => i.category))];
 
-  if (loading) {
-
-    return (
-      <div className="p-6 text-gray-500">
-        Loading orders...
-      </div>
-    );
-
-  }
-
-  return (
-
-    <div className="p-4 md:p-6 max-w-6xl mx-auto">
-
-      <h1 className="text-2xl font-bold mb-6">
-        Counter Orders
-      </h1>
-
-      {items.length === 0 && (
-        <p className="text-gray-400">
-          No active items
-        </p>
-      )}
-
-      {/* GRID */}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-
-        {items.map((item) => (
-
-          <div
-            key={item._id}
-            className={`border rounded-xl p-4 shadow-sm flex flex-col gap-3
-            ${item.kitchenStatus === 'ready' ? 'border-green-500 bg-green-50' : ''}
-            `}
-          >
-
-            {/* TABLE */}
-
-            <div className="flex justify-between items-center">
-
-              <span className="font-bold text-lg">
-                Table {item.tableId?.tableNumber}
-              </span>
-
-              <span
-                className={`text-white text-xs px-3 py-1 rounded-full ${statusColor(
-                  item.kitchenStatus
-                )}`}
-              >
-                {item.kitchenStatus}
-              </span>
-
-            </div>
-
-            {/* ITEM */}
-
-            <div>
-
-              <p className="font-medium text-lg">
-                {item.nameSnapshot}
-              </p>
-
-              <p className="text-sm text-gray-500">
-                Quantity: {item.quantity}
-              </p>
-
-            </div>
-
-          </div>
-
-        ))}
-
-      </div>
-
-    </div>
-
+  const filteredMenu = menuItems.filter(
+    (i) =>
+      i.category === category &&
+      i.name.toLowerCase().includes(search.toLowerCase()),
   );
 
+  const total = orderItems
+    .filter((i) => i.kitchenStatus !== 'draft')
+    .reduce((sum, i) => sum + i.priceSnapshot * i.quantity, 0);
+
+  return (
+    <div className="h-screen grid grid-cols-1 lg:grid-cols-2 gap-4 p-3 md:p-6">
+      {/* MENU */}
+
+      <div className="space-y-4 overflow-y-auto">
+        <h2 className="text-xl font-bold">Menu</h2>
+
+        <Input
+          placeholder="Search item..."
+          value={search}
+          onChange={(e: any) => setSearch(e.target.value)}
+        />
+
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          {categories.map((cat) => (
+            <Button
+              key={cat}
+              onClick={() => setCategory(cat)}
+              className={
+                category === cat ? 'bg-black text-white' : 'bg-gray-200'
+              }
+            >
+              {cat}
+            </Button>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          {filteredMenu.map((item) => (
+            <Card
+              key={item._id}
+              onClick={() => addItem(item)}
+              className="p-4 cursor-pointer hover:shadow-lg active:scale-95"
+            >
+              <div className="flex justify-between">
+                <span>{item.name}</span>
+                <span>₹{item.price}</span>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {/* ORDER */}
+
+      <div className="border rounded-xl p-4 flex flex-col">
+        <h2 className="text-xl font-bold mb-4">Current Order</h2>
+
+        <div className="flex-1 overflow-y-auto space-y-3">
+          {orderItems.map((item) => (
+            <Card key={item._id} className="p-3">
+              <div className="flex justify-between">
+                <div>
+                  <p>{item.nameSnapshot}</p>
+                  <p className="text-xs">{item.kitchenStatus}</p>
+                </div>
+
+                <span>x{item.quantity}</span>
+              </div>
+            </Card>
+          ))}
+        </div>
+
+        <div className="border-t pt-4 mt-4 sticky bottom-0 bg-white">
+          <div className="flex justify-between font-bold">
+            <span>Total</span>
+            <span>₹{total}</span>
+          </div>
+
+          <Button
+            className="w-full mt-4 bg-green-600"
+            onClick={() =>
+              router.push(`/counter/tables/${tableId}/bill/${orderId}`)
+            }
+          >
+            View Bill
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 }

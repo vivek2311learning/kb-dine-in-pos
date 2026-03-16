@@ -3,16 +3,17 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 export interface IBill extends Document {
   billNumber: number;
   orderId: mongoose.Types.ObjectId;
+
   subtotal: number;
   tax: number;
   discount: number;
   totalAmount: number;
+
   printedAt: Date;
 
   paidAt?: Date;
   isPaid: boolean;
 
-  // Refund
   isRefunded: boolean;
   refundAt?: Date;
   refundReason?: string;
@@ -28,26 +29,36 @@ const BillSchema = new Schema<IBill>(
       unique: true,
       index: true,
     },
+
     orderId: {
       type: Schema.Types.ObjectId,
       ref: 'Order',
       required: true,
       index: true,
     },
+
     subtotal: { type: Number, required: true },
+
     tax: { type: Number, default: 0 },
+
     discount: { type: Number, default: 0 },
+
     totalAmount: { type: Number, required: true },
+
     printedAt: { type: Date, default: Date.now },
 
     paidAt: { type: Date },
-    isPaid: { type: Boolean, default: false },
 
-    // Refund fields
-    isRefunded: { type: Boolean, default: false },
+    isPaid: { type: Boolean, default: false, index: true },
+
+    isRefunded: { type: Boolean, default: false, index: true },
+
     refundAt: { type: Date },
+
     refundReason: { type: String },
+
     refundAmount: { type: Number },
+
     refundedBy: {
       type: Schema.Types.ObjectId,
       ref: 'User',
@@ -55,6 +66,10 @@ const BillSchema = new Schema<IBill>(
   },
   { timestamps: true },
 );
+
+/* Performance */
+
+BillSchema.index({ orderId: 1 });
 
 export default (mongoose.models.Bill as Model<IBill>) ||
   mongoose.model<IBill>('Bill', BillSchema);

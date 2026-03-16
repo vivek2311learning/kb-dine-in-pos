@@ -115,5 +115,11 @@ const OrderItemSchema = new Schema<IOrderItem>(
   { timestamps: true },
 );
 
+/* Performance Indexes */
+
+OrderItemSchema.index({ orderId: 1, kitchenStatus: 1 });
+OrderItemSchema.index({ tableId: 1, served: 1 });
+OrderItemSchema.index({ cancelled: 1 });
+
 export default (mongoose.models.OrderItem as Model<IOrderItem>) ||
   mongoose.model<IOrderItem>('OrderItem', OrderItemSchema);

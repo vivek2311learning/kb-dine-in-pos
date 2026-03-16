@@ -17,20 +17,24 @@ const PaymentSchema = new Schema<IPayment>(
       required: true,
       index: true,
     },
+
     method: {
       type: String,
       enum: ['cash', 'upi', 'card'],
       required: true,
     },
+
     amount: {
       type: Number,
       required: true,
     },
+
     receivedBy: {
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: true,
     },
+
     paidAt: {
       type: Date,
       default: Date.now,
@@ -38,6 +42,10 @@ const PaymentSchema = new Schema<IPayment>(
   },
   { timestamps: true },
 );
+
+/* Performance */
+
+PaymentSchema.index({ billId: 1, paidAt: -1 });
 
 export default (mongoose.models.Payment as Model<IPayment>) ||
   mongoose.model<IPayment>('Payment', PaymentSchema);

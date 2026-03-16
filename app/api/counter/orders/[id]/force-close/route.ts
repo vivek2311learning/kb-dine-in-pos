@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/app/lib/db';
 import Order from '@/app/lib/models/order';
@@ -17,6 +18,8 @@ export async function PATCH(
 
     const { id } = await context.params;
 
+    /* -------- VALIDATE ID -------- */
+
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json({ error: 'Invalid order id' }, { status: 400 });
     }
@@ -27,50 +30,63 @@ export async function PATCH(
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
-    /* ---------------- FIND ITEMS ---------------- */
+    /* -------- SERVED CHECK -------- */
 
-    const items = await OrderItem.find({
+    const servedExists = await OrderItem.exists({
       orderId: id,
+      served: true,
       cancelled: false,
     });
 
-    /* ---------------- SERVED CHECK ---------------- */
-
-    const servedItems = items.filter((i) => i.served);
-
-    if (servedItems.length > 0) {
+    if (servedExists) {
       return NextResponse.json(
         { error: 'Cannot close order. Items already served.' },
         { status: 400 },
       );
     }
 
-    /* ---------------- HANDLE ITEMS ---------------- */
+    /* -------- READY ITEMS → WASTE -------- */
 
-    for (const item of items) {
-      // READY BUT NOT SERVED → WASTAGE
-      if (item.kitchenStatus === 'ready' && !item.served) {
-        item.wasted = true;
-        item.billable = false;
-      }
+    await OrderItem.updateMany(
+      {
+        orderId: id,
+        kitchenStatus: 'ready',
+        served: false,
+        cancelled: false,
+      },
+      {
+        $set: {
+          wasted: true,
+          billable: false,
+        },
+      },
+    );
 
-      // NOT READY → CANCEL
-      else {
-        item.cancelled = true;
-        item.billable = false;
-      }
+    /* -------- OTHER ITEMS → CANCEL -------- */
 
-      await item.save();
-    }
+    await OrderItem.updateMany(
+      {
+        orderId: id,
+        kitchenStatus: { $ne: 'ready' },
+        cancelled: false,
+      },
+      {
+        $set: {
+          cancelled: true,
+          billable: false,
+        },
+      },
+    );
 
-    /* ---------------- CLOSE ORDER ---------------- */
+    /* -------- CLOSE ORDER -------- */
 
     order.status = 'closed';
     order.closedAt = new Date();
+    order.closedReason = 'abandoned';
 
     await order.save();
 
-    /* ---------------- FREE TABLE ---------------- */
+    /* -------- FREE TABLE -------- */
 
     await Table.findByIdAndUpdate(order.tableId, {
       status: 'free',
@@ -79,11 +95,15 @@ export async function PATCH(
 
     return NextResponse.json({
       success: true,
-      message: 'Table freed successfully',
+      orderId: id,
+      tableFreed: true,
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error('Force Close Error:', err);
 
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to close order' },
+      { status: 500 },
+    );
   }
 }

@@ -16,7 +16,6 @@ interface Bill {
 }
 
 export default function AdminBillsPage() {
-
   const router = useRouter();
 
   const [bills, setBills] = useState<Bill[]>([]);
@@ -25,9 +24,7 @@ export default function AdminBillsPage() {
   const [loading, setLoading] = useState(true);
 
   const fetchBills = async () => {
-
     try {
-
       let url = '/api/admin/bills';
 
       if (from && to) {
@@ -39,13 +36,11 @@ export default function AdminBillsPage() {
       const data = await res.json();
 
       setBills(data);
-
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-
   };
 
   useEffect(() => {
@@ -55,7 +50,6 @@ export default function AdminBillsPage() {
   /* ---------------- STATUS BADGE ---------------- */
 
   const statusBadge = (bill: Bill) => {
-
     if (bill.isRefunded) {
       return (
         <span className="text-xs px-2 py-1 rounded bg-red-100 text-red-600">
@@ -77,27 +71,19 @@ export default function AdminBillsPage() {
         Unpaid
       </span>
     );
-
   };
 
   /* ---------------- UI ---------------- */
 
   return (
-
     <div className="p-4 md:p-8 space-y-6 max-w-6xl mx-auto">
-
-      <h1 className="text-3xl font-bold">
-        Bills
-      </h1>
+      <h1 className="text-3xl font-bold">Bills</h1>
 
       {/* FILTER */}
 
       <Card className="p-4">
-
         <div className="flex flex-col md:flex-row gap-4 md:items-end">
-
           <div>
-
             <label htmlFor="from-date" className="text-sm block mb-1">
               From Date
             </label>
@@ -109,11 +95,9 @@ export default function AdminBillsPage() {
               onChange={(e) => setFrom(e.target.value)}
               className="border p-2 rounded w-full"
             />
-
           </div>
 
           <div>
-
             <label htmlFor="to-date" className="text-sm block mb-1">
               To Date
             </label>
@@ -125,72 +109,43 @@ export default function AdminBillsPage() {
               onChange={(e) => setTo(e.target.value)}
               className="border p-2 rounded w-full"
             />
-
           </div>
 
-          <Button onClick={fetchBills}>
-            Filter
-          </Button>
-
+          <Button onClick={fetchBills}>Filter</Button>
         </div>
-
       </Card>
-
 
       {/* LIST */}
 
-      {loading && (
-        <p className="text-gray-500">
-          Loading bills...
-        </p>
-      )}
+      {loading && <p className="text-gray-500">Loading bills...</p>}
 
       {!loading && bills.length === 0 && (
-        <p className="text-red-500 text-center py-10">
-          No bills found
-        </p>
+        <p className="text-red-500 text-center py-10">No bills found</p>
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-
         {bills.map((bill) => (
-
           <Card
             key={bill._id}
             className="p-4 cursor-pointer hover:shadow-lg transition"
             onClick={() => router.push(`/admin/bills/${bill._id}`)}
           >
-
             <div className="flex justify-between items-center">
-
               <div>
-
-                <p className="font-semibold">
-                  Bill #{bill.billNumber}
-                </p>
+                <p className="font-semibold">Bill #{bill.billNumber}</p>
 
                 <p className="text-xs ">
                   {new Date(bill.printedAt).toLocaleString()}
                 </p>
-
               </div>
 
               {statusBadge(bill)}
-
             </div>
 
-            <div className="mt-3 text-lg font-bold">
-              ₹{bill.totalAmount}
-            </div>
-
+            <div className="mt-3 text-lg font-bold">₹{bill.totalAmount}</div>
           </Card>
-
         ))}
-
       </div>
-
     </div>
-
   );
-
 }

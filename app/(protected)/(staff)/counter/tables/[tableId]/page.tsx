@@ -58,7 +58,7 @@ export default function TablePage() {
 
       if (table.status === 'occupied' && table.currentOrderId) {
         router.push(
-          `/counter/tables/${tableId}/order?orderId=${table.currentOrderId}`
+          `/counter/tables/${tableId}/order?orderId=${table.currentOrderId}`,
         );
         return;
       }
@@ -75,10 +75,7 @@ export default function TablePage() {
 
       const newOrder = await res.json();
 
-      router.push(
-        `/counter/tables/${tableId}/order?orderId=${newOrder._id}`
-      );
-
+      router.push(`/counter/tables/${tableId}/order?orderId=${newOrder._id}`);
     } catch (err) {
       console.error(err);
     } finally {
@@ -90,35 +87,21 @@ export default function TablePage() {
 
   if (loading) {
     return (
-      <div className="p-6 text-center text-gray-500">
-        Loading table...
-      </div>
+      <div className="p-6 text-center text-gray-500">Loading table...</div>
     );
   }
 
   if (!table) {
-    return (
-      <div className="p-6 text-center text-gray-500">
-        Table not found
-      </div>
-    );
+    return <div className="p-6 text-center text-gray-500">Table not found</div>;
   }
 
   return (
     <div className="p-6 max-w-xl mx-auto">
-
       <Card className="p-6 space-y-4">
-
         <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold">Table {table.tableNumber}</h1>
 
-          <h1 className="text-2xl font-bold">
-            Table {table.tableNumber}
-          </h1>
-
-          <Badge>
-            {table.status === 'free' ? 'Free' : 'Occupied'}
-          </Badge>
-
+          <Badge>{table.status === 'free' ? 'Free' : 'Occupied'}</Badge>
         </div>
 
         <Button
@@ -129,12 +112,10 @@ export default function TablePage() {
           {processing
             ? 'Opening...'
             : table.status === 'free'
-            ? 'Start New Order'
-            : 'View Current Order'}
+              ? 'Start New Order'
+              : 'View Current Order'}
         </Button>
-
       </Card>
-
     </div>
   );
 }

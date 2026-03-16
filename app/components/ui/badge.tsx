@@ -1,21 +1,20 @@
-import { HTMLAttributes, ReactNode } from "react"
-import { Slot } from "@radix-ui/react-slot"
+import { HTMLAttributes, ReactNode } from 'react';
+import { Slot } from '@radix-ui/react-slot';
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
-  children: ReactNode
-  variant?: "wood" | "outline" | "ghost"
-  asChild?: boolean
+  children: ReactNode;
+  variant?: 'wood' | 'outline' | 'ghost';
+  asChild?: boolean;
 }
 
 export function Badge({
   children,
-  className = "",
-  variant = "wood",
+  className = '',
+  variant = 'wood',
   asChild = false,
   ...props
 }: BadgeProps) {
-
-  const Comp = asChild ? Slot : "span"
+  const Comp = asChild ? Slot : 'span';
 
   const variants = {
     wood: `
@@ -31,8 +30,8 @@ export function Badge({
     `,
     ghost: `
       bg-[#f5f2ee]
-    `
-  }
+    `,
+  };
 
   return (
     <Comp
@@ -63,5 +62,5 @@ export function Badge({
     >
       {children}
     </Comp>
-  )
+  );
 }

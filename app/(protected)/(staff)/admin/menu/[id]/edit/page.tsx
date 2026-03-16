@@ -25,20 +25,16 @@ export default async function EditMenuPage({
     updatedAt: (item as any).updatedAt?.toISOString(),
   };
   return (
-      <div className="p-4 md:p-8 max-w-3xl mx-auto space-y-6">
-  
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold">
-            Edit Menu Item
-          </h1>
-  
-          <p className="text-sm text-gray-500 mt-1">
-            Edit item for the restaurant menu
-          </p>
-        </div>
-  
-        <MenuForm initialData={safeItem} isEdit />
-  
+    <div className="p-4 md:p-8 max-w-3xl mx-auto space-y-6">
+      <div>
+        <h1 className="text-2xl md:text-3xl font-bold">Edit Menu Item</h1>
+
+        <p className="text-sm text-gray-500 mt-1">
+          Edit item for the restaurant menu
+        </p>
       </div>
-    );
+
+      <MenuForm initialData={safeItem} isEdit />
+    </div>
+  );
 }

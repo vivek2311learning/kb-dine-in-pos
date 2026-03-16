@@ -16,6 +16,7 @@ interface Analytics {
 export default function AdminReportsPage() {
   const [data, setData] = useState<Analytics | null>(null);
   const router = useRouter();
+
   useEffect(() => {
     fetch('/api/admin/analytic', { cache: 'no-store' })
       .then((res) => res.json())
@@ -38,7 +39,7 @@ export default function AdminReportsPage() {
           className="p-4 text-center"
           onClick={() => router.push('/admin/revenue')}
         >
-          <p className="text-sm text-gray-500">Today's Revenue</p>
+          <p className="text-sm text-gray-500">Today&apos;s Revenue</p>
           <p className="text-2xl font-bold mt-2">
             ₹{data.revenue.todayRevenue}
           </p>
@@ -48,7 +49,7 @@ export default function AdminReportsPage() {
           className="p-4 text-center"
           onClick={() => router.push('/admin/bills?today=true')}
         >
-          <p className="text-sm text-gray-500">Today's Bills</p>
+          <p className="text-sm text-gray-500">Today&apos;s Bills</p>
           <p className="text-2xl font-bold mt-2">{data.revenue.todaysBills}</p>
         </Card>
 
@@ -64,7 +65,8 @@ export default function AdminReportsPage() {
 
         <Card className="p-4 text-center">
           <p className="text-sm text-gray-500">Average Rating</p>
-          <span className="text-2xl font-bold mt-2  flex items-center justify-center">
+
+          <span className="text-2xl font-bold mt-2 flex items-center justify-center gap-2">
             <StarRating rating={data.feedback.avgRating} />
             <p>{data.feedback.avgRating.toFixed(1)}</p>
           </span>
@@ -79,7 +81,6 @@ export default function AdminReportsPage() {
         {data.insights.topItems.map((item: any, i: number) => (
           <div key={i} className="flex justify-between border-b py-2">
             <span>{item._id}</span>
-
             <span>{item.totalSold} sold</span>
           </div>
         ))}
@@ -93,7 +94,6 @@ export default function AdminReportsPage() {
         <div className="flex gap-8">
           <div>
             <p className="text-sm text-gray-500">Items Wasted</p>
-
             <p className="text-lg font-semibold">
               {data.insights.wastageItems}
             </p>
@@ -101,7 +101,6 @@ export default function AdminReportsPage() {
 
           <div>
             <p className="text-sm text-gray-500">Wastage Value</p>
-
             <p className="text-lg font-semibold">
               ₹{data.insights.wastageValue}
             </p>
@@ -117,7 +116,6 @@ export default function AdminReportsPage() {
         {Object.entries(data.feedback.ratingCounts).map(([rating, count]) => (
           <div key={rating} className="flex justify-between border-b py-2">
             <span>{rating} ⭐</span>
-
             <span>{count as number}</span>
           </div>
         ))}

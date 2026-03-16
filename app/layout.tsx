@@ -20,7 +20,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${rusticFont.variable} ${bodyFont.variable}`}>
+    <html lang="en" className={'${rusticFont.variable} ${bodyFont.variable}'}>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+      </head>
+
       <body className="antialiased bg-wood-light text-ink font-body">
         <NotificationProvider>{children}</NotificationProvider>
       </body>

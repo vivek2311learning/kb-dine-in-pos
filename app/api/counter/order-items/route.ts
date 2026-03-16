@@ -37,11 +37,10 @@ export async function POST(req: Request) {
     // 🔥 Create new item (DRAFT)
     const newItem = await OrderItem.create({
       orderId,
-      tableId: order.tableId,
+      tableId: order.tableId || undefined,
       nameSnapshot: name,
       priceSnapshot: price,
       quantity: quantity || 1,
-      kitchenStatus: 'draft',
     });
 
     return NextResponse.json(newItem);

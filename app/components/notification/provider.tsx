@@ -88,9 +88,7 @@ export function NotificationProvider({
 
       <div className="fixed top-6 right-6 z-50 space-y-3">
         {notifications.map((notification) => (
-          <div key={notification.id}>
-            {renderNotification(notification)}
-          </div>
+          <div key={notification.id}>{renderNotification(notification)}</div>
         ))}
       </div>
     </NotificationContext.Provider>

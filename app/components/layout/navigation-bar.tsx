@@ -41,10 +41,10 @@ export function NavigationBar() {
     role === 'admin'
       ? '/admin/dashboard'
       : role === 'counter'
-      ? '/counter/tables'
-      : role === 'kitchen'
-      ? '/kitchen/orders'
-      : '/';
+        ? '/counter/tables'
+        : role === 'kitchen'
+          ? '/kitchen/orders'
+          : '/';
 
   /* Logout */
 
@@ -57,13 +57,10 @@ export function NavigationBar() {
 
   return (
     <header className="w-full border-b border-[#3b2a1a]/20 shadow-sm">
-
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-4">
-
         {/* LEFT */}
 
         <div className="flex items-center gap-8">
-
           <Badge className="py-4 bg-[#e0c4a2] hover:bg-[#e0c4a2]/80 transition">
             <Link href="/" className="font-rustic text-2xl text-[#3b2a1a]">
               KB Restaurant
@@ -96,13 +93,11 @@ export function NavigationBar() {
               );
             })}
           </nav>
-
         </div>
 
         {/* RIGHT (Desktop) */}
 
         <div className="hidden md:flex items-center gap-3">
-
           {!role ? (
             <Link href="/login">
               <Button className="px-4 py-1 text-sm text-[#3b2a1a]">
@@ -126,7 +121,6 @@ export function NavigationBar() {
               </Button>
             </>
           )}
-
         </div>
 
         {/* MOBILE MENU BUTTON */}
@@ -142,7 +136,6 @@ export function NavigationBar() {
             <span className="block w-6 h-0.5 bg-[#3b2a1a]" />
           </div>
         </button>
-
       </div>
 
       {/* MOBILE MENU */}
@@ -154,7 +147,6 @@ export function NavigationBar() {
           ${isOpen ? 'max-h-96 py-6 opacity-100' : 'max-h-0 py-0 opacity-0'}
         `}
       >
-
         {NAV_ITEMS.map((item) => {
           const isActive = pathname === item.href;
 
@@ -201,7 +193,6 @@ export function NavigationBar() {
             </button>
           </>
         )}
-
       </div>
     </header>
   );

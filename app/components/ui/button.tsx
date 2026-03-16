@@ -1,35 +1,34 @@
-import { ButtonHTMLAttributes, ReactNode } from "react"
-import { Slot } from "@radix-ui/react-slot"
+import { ButtonHTMLAttributes, ReactNode } from 'react';
+import { Slot } from '@radix-ui/react-slot';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  children: ReactNode
-  asChild?: boolean
-  variant?: "primary" | "outline" | "ghost"
-  size?: "sm" | "md" | "lg"
+  children: ReactNode;
+  asChild?: boolean;
+  variant?: 'primary' | 'outline' | 'ghost';
+  size?: 'sm' | 'md' | 'lg';
 }
 
 export function Button({
   children,
-  className = "",
+  className = '',
   asChild = false,
-  variant = "primary",
-  size = "md",
+  variant = 'primary',
+  size = 'md',
   ...props
 }: ButtonProps) {
-
-  const Comp = asChild ? Slot : "button"
+  const Comp = asChild ? Slot : 'button';
 
   const variants = {
     primary: "bg-[url('/textures/wood.png')] bg-cover bg-center",
-    outline: "border border-[#3b2a1a] bg-transparent",
-    ghost: "bg-transparent"
-  }
+    outline: 'border border-[#3b2a1a] bg-transparent',
+    ghost: 'bg-transparent',
+  };
 
   const sizes = {
-    sm: "px-4 py-2 text-sm",
-    md: "px-6 py-3",
-    lg: "px-8 py-4 text-lg"
-  }
+    sm: 'px-4 py-2 text-sm',
+    md: 'px-6 py-3',
+    lg: 'px-8 py-4 text-lg',
+  };
 
   return (
     <Comp
@@ -59,5 +58,5 @@ export function Button({
     >
       {children}
     </Comp>
-  )
+  );
 }

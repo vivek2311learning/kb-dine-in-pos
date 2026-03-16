@@ -19,7 +19,6 @@ export default async function ProtectedLayout({
 }: {
   children: React.ReactNode;
 }) {
-
   const user = await getUser();
 
   /* NOT LOGGED IN */
@@ -32,14 +31,10 @@ export default async function ProtectedLayout({
 
   return (
     <div className="min-h-screen flex flex-col">
-
       {/* ROLE BASED NAVBAR */}
       <Navbar />
 
-      <main className="flex-1 p-6">
-        {children}
-      </main>
-
+      <main className="flex-1 p-6">{children}</main>
     </div>
   );
 }

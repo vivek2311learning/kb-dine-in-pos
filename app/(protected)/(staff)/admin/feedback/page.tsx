@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/app/components/ui/card';
-import StarRating from '@/app/components/ui/starRating'
+import StarRating from '@/app/components/ui/starRating';
 
 interface Feedback {
   _id: string;
@@ -53,8 +53,6 @@ export default function AdminFeedbackPage() {
 
     return 'bg-red-100 text-red-700';
   };
-
- 
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">

@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/app/lib/db';
 import Order from '@/app/lib/models/order';
@@ -16,7 +17,9 @@ export async function PATCH(
     await requireRole(['counter', 'admin']);
     await connectDB();
 
-    const { id } = await context.params; // ✅ IMPORTANT
+    const { id } = await context.params;
+
+    /* VALIDATE ID */
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json({ error: 'Invalid order id' }, { status: 400 });
@@ -35,46 +38,65 @@ export async function PATCH(
       );
     }
 
-    // ❗ Prevent abandon if bill already exists
-    const existingBill = await Bill.findOne({ orderId: id });
-    if (existingBill) {
+    /* BILL CHECK */
+
+    const billExists = await Bill.exists({ orderId: id });
+
+    if (billExists) {
       return NextResponse.json(
         { error: 'Cannot abandon after bill generated' },
         { status: 400 },
       );
     }
 
-    // ❗ Check if any confirmed item exists
-    const confirmedItems = await OrderItem.find({
+    /* CONFIRMED ITEMS CHECK */
+
+    const confirmedExists = await OrderItem.exists({
       orderId: id,
       kitchenStatus: { $ne: 'draft' },
       cancelled: false,
     });
 
-    if (confirmedItems.length > 0) {
+    if (confirmedExists) {
       return NextResponse.json(
         { error: 'Cannot abandon. Items already confirmed.' },
         { status: 400 },
       );
     }
 
-    // ✅ Delete draft items
-    await OrderItem.deleteMany({ orderId: id });
+    /* DELETE ONLY DRAFT ITEMS */
 
-    // ✅ Close order
+    await OrderItem.deleteMany({
+      orderId: id,
+      kitchenStatus: 'draft',
+    });
+
+    /* CLOSE ORDER */
+
     order.status = 'closed';
     order.closedAt = new Date();
+    order.closedReason = 'abandoned';
+
     await order.save();
 
-    // ✅ Free table
+    /* FREE TABLE */
+
     await Table.findByIdAndUpdate(order.tableId, {
       status: 'free',
       currentOrderId: null,
     });
 
-    return NextResponse.json({ success: true });
-  } catch (err: any) {
+    return NextResponse.json({
+      success: true,
+      orderId: id,
+      tableFreed: true,
+    });
+  } catch (err) {
     console.error('Abandon Order Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+
+    return NextResponse.json(
+      { error: 'Failed to abandon order' },
+      { status: 500 },
+    );
   }
 }

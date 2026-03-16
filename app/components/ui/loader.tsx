@@ -1,30 +1,29 @@
-import { HTMLAttributes } from "react"
+import { HTMLAttributes } from 'react';
 
 interface LoaderProps extends HTMLAttributes<HTMLDivElement> {
-  size?: "sm" | "md" | "lg"
-  centered?: boolean
+  size?: 'sm' | 'md' | 'lg';
+  centered?: boolean;
 }
 
 const sizeMap = {
-  sm: "w-4 h-4",
-  md: "w-6 h-6",
-  lg: "w-10 h-10"
-}
+  sm: 'w-4 h-4',
+  md: 'w-6 h-6',
+  lg: 'w-10 h-10',
+};
 
 export function Loader({
-  size = "md",
+  size = 'md',
   centered = false,
-  className = "",
+  className = '',
   ...props
 }: LoaderProps) {
-
   return (
     <div
       role="status"
       aria-label="Loading"
       {...props}
       className={`
-        ${centered ? "flex justify-center items-center" : ""}
+        ${centered ? 'flex justify-center items-center' : ''}
 
         ${sizeMap[size]}
         rounded-full
@@ -39,5 +38,5 @@ export function Loader({
     >
       <span className="sr-only">Loading...</span>
     </div>
-  )
+  );
 }

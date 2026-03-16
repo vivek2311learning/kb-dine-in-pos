@@ -1,25 +1,16 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface IRefundLog extends Document {
-
   billId: mongoose.Types.ObjectId;
-
   orderId: mongoose.Types.ObjectId;
-
   amount: number;
-
   reason: string;
-
   refundedBy: mongoose.Types.ObjectId;
-
   refundedAt: Date;
-
 }
 
 const RefundLogSchema = new Schema<IRefundLog>(
-
   {
-
     billId: {
       type: Schema.Types.ObjectId,
       ref: 'Bill',
@@ -53,14 +44,16 @@ const RefundLogSchema = new Schema<IRefundLog>(
     refundedAt: {
       type: Date,
       default: Date.now,
+      index: true,
     },
-
   },
-
-  { timestamps: true }
-
+  { timestamps: true },
 );
 
-export default (mongoose.models.RefundLog as Model<IRefundLog>) ||
+/* Indexes */
 
-mongoose.model<IRefundLog>('RefundLog', RefundLogSchema);
+RefundLogSchema.index({ billId: 1 });
+RefundLogSchema.index({ refundedAt: -1 });
+
+export default (mongoose.models.RefundLog as Model<IRefundLog>) ||
+  mongoose.model<IRefundLog>('RefundLog', RefundLogSchema);

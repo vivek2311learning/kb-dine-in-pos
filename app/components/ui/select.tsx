@@ -21,7 +21,6 @@ export function Select({
 
   return (
     <div className="space-y-1.5 w-full">
-
       {label && (
         <label
           htmlFor={selectId}
@@ -68,11 +67,7 @@ export function Select({
         </div>
       </div>
 
-      {error && (
-        <p className="text-xs text-red-700 font-medium">
-          {error}
-        </p>
-      )}
+      {error && <p className="text-xs text-red-700 font-medium">{error}</p>}
     </div>
   );
 }

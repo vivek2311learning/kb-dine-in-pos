@@ -76,8 +76,6 @@ export default function AdminOrdersPage() {
           >
             <div className="flex justify-between">
               <div className="space-y-1">
-               
-
                 <p className="font-bold">
                   Table {order.table?.tableNumber || '-'}
                 </p>

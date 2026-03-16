@@ -9,7 +9,6 @@ export default function MainLayout({
 }) {
   return (
     <div className="flex min-h-screen flex-col">
-
       {/* Notifications */}
       <Toaster
         position="top-center"
@@ -22,13 +21,10 @@ export default function MainLayout({
       <Header />
 
       {/* Page Content */}
-      <main className="flex-1">
-        {children}
-      </main>
+      <main className="flex-1">{children}</main>
 
       {/* Footer */}
       <Footer />
-
     </div>
   );
 }

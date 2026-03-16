@@ -38,22 +38,12 @@ export function Notification({
         ${className}
       `}
     >
-      {icon && (
-        <div className="flex-shrink-0 text-lg">
-          {icon}
-        </div>
-      )}
+      {icon && <div className="flex-shrink-0 text-lg">{icon}</div>}
 
       <div className="flex-1">
-        {title && (
-          <h4 className="font-rustic text-sm mb-1">
-            {title}
-          </h4>
-        )}
+        {title && <h4 className="font-rustic text-sm mb-1">{title}</h4>}
 
-        <div className="text-sm opacity-90">
-          {children}
-        </div>
+        <div className="text-sm opacity-90">{children}</div>
       </div>
 
       {onClose && (

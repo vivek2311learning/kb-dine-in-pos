@@ -1,19 +1,15 @@
-
-
-
-
 // // $env:MONGODB_URI="mongodb+srv://dbuser:dbtest@cluster0.gkqvbyc.mongodb.net/kb_dine-in";
 
 // //  node scripts/seed.cjs
-const mongoose = require('mongoose')
-const bcrypt = require('bcryptjs')
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 /* ================= CONNECT ================= */
 
 const connectDB = async () => {
-  await mongoose.connect(process.env.MONGODB_URI)
-  console.log('MongoDB Connected')
-}
+  await mongoose.connect(process.env.MONGODB_URI);
+  console.log('MongoDB Connected');
+};
 
 /* ================= USER MODEL ================= */
 
@@ -23,9 +19,9 @@ const UserSchema = new mongoose.Schema({
   password: String,
   role: String,
   isActive: Boolean,
-})
+});
 
-const User = mongoose.model('User', UserSchema)
+const User = mongoose.model('User', UserSchema);
 
 /* ================= MENU MODEL ================= */
 
@@ -37,10 +33,10 @@ const MenuItemSchema = new mongoose.Schema(
     category: String,
     status: String,
   },
-  { timestamps: true }
-)
+  { timestamps: true },
+);
 
-const MenuItem = mongoose.model('MenuItem', MenuItemSchema)
+const MenuItem = mongoose.model('MenuItem', MenuItemSchema);
 
 /* ================= MENU DATA ================= */
 
@@ -55,7 +51,7 @@ const starters = [
   { name: 'Veg Crispy', price: 185 },
   { name: 'Paneer Pakoda', price: 175 },
   { name: 'Cheese Garlic Bread', price: 150 },
-]
+];
 
 const mains = [
   { name: 'Butter Paneer', price: 260 },
@@ -68,7 +64,7 @@ const mains = [
   { name: 'Jeera Rice', price: 140 },
   { name: 'Veg Biryani', price: 230 },
   { name: 'Paneer Biryani', price: 260 },
-]
+];
 
 const beverages = [
   { name: 'Coca Cola', price: 40 },
@@ -81,7 +77,7 @@ const beverages = [
   { name: 'Strawberry Shake', price: 120 },
   { name: 'Sweet Lassi', price: 90 },
   { name: 'Salted Lassi', price: 90 },
-]
+];
 
 const desserts = [
   { name: 'Gulab Jamun', price: 80 },
@@ -94,21 +90,21 @@ const desserts = [
   { name: 'Caramel Custard', price: 130 },
   { name: 'Fruit Salad', price: 110 },
   { name: 'Falooda', price: 150 },
-]
+];
 
 /* ================= SEED ================= */
 
 async function seed() {
-  await connectDB()
+  await connectDB();
 
-  console.log('Clearing old data...')
+  console.log('Clearing old data...');
 
-  await User.deleteMany({})
-  await MenuItem.deleteMany({})
+  await User.deleteMany({});
+  await MenuItem.deleteMany({});
 
   /* ================= USERS ================= */
 
-  const password = await bcrypt.hash('123456', 10)
+  const password = await bcrypt.hash('123456', 10);
 
   await User.insertMany([
     {
@@ -132,13 +128,13 @@ async function seed() {
       role: 'kitchen',
       isActive: true,
     },
-  ])
+  ]);
 
-  console.log('Users seeded')
+  console.log('Users seeded');
 
   /* ================= MENU ITEMS ================= */
 
-  const menuItems = []
+  const menuItems = [];
 
   starters.forEach((i) =>
     menuItems.push({
@@ -147,8 +143,8 @@ async function seed() {
       price: i.price,
       category: 'Starters',
       status: 'active',
-    })
-  )
+    }),
+  );
 
   mains.forEach((i) =>
     menuItems.push({
@@ -157,8 +153,8 @@ async function seed() {
       price: i.price,
       category: 'Main Course',
       status: 'active',
-    })
-  )
+    }),
+  );
 
   beverages.forEach((i) =>
     menuItems.push({
@@ -167,8 +163,8 @@ async function seed() {
       price: i.price,
       category: 'Beverages',
       status: 'active',
-    })
-  )
+    }),
+  );
 
   desserts.forEach((i) =>
     menuItems.push({
@@ -177,14 +173,14 @@ async function seed() {
       price: i.price,
       category: 'Desserts',
       status: 'active',
-    })
-  )
+    }),
+  );
 
-  await MenuItem.insertMany(menuItems)
+  await MenuItem.insertMany(menuItems);
 
-  console.log(`Menu seeded (${menuItems.length} items)`)
+  console.log(`Menu seeded (${menuItems.length} items)`);
 
-  process.exit()
+  process.exit();
 }
 
-seed()
+seed();

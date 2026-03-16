@@ -1,19 +1,17 @@
-import { InputHTMLAttributes, forwardRef, ReactNode, useId } from "react"
+import { InputHTMLAttributes, forwardRef, ReactNode, useId } from 'react';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
-  label?: ReactNode
-  error?: string
+  label?: ReactNode;
+  error?: string;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, className = "", id, disabled, ...props }, ref) => {
-
-    const generatedId = useId()
-    const inputId = id || generatedId
+  ({ label, error, className = '', id, disabled, ...props }, ref) => {
+    const generatedId = useId();
+    const inputId = id || generatedId;
 
     return (
       <div className="space-y-1.5">
-
         {label && (
           <label
             htmlFor={inputId}
@@ -38,7 +36,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             placeholder:text-[#3b2a1a]/50
 
             border
-            ${error ? "border-red-600" : "border-[#3b2a1a]/30"}
+            ${error ? 'border-red-600' : 'border-[#3b2a1a]/30'}
 
             focus:border-[#3b2a1a]
             focus:outline-none
@@ -55,15 +53,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           `}
         />
 
-        {error && (
-          <p className="text-xs text-red-700 font-medium">
-            {error}
-          </p>
-        )}
-
+        {error && <p className="text-xs text-red-700 font-medium">{error}</p>}
       </div>
-    )
-  }
-)
+    );
+  },
+);
 
-Input.displayName = "Input"
+Input.displayName = 'Input';

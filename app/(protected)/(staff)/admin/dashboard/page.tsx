@@ -85,13 +85,14 @@ export default function AdminDashboardPage() {
 
         <ClickableCard
           title="Average Rating"
-          value={<span className="text-2xl font-bold mt-2  flex items-center justify-center">
-          <StarRating rating={data.feedback.avgRating} />
-          <span>{data.feedback.avgRating.toFixed(1)}</span>
-        </span>}
+          value={
+            <span className="text-2xl font-bold mt-2  flex items-center justify-center">
+              <StarRating rating={data.feedback.avgRating} />
+              <span>{data.feedback.avgRating.toFixed(1)}</span>
+            </span>
+          }
           onClick={() => router.push('/admin/feedback')}
         />
-        
       </DashboardSection>
     </div>
   );

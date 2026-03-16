@@ -15,15 +15,19 @@ const TableSchema = new Schema<ITable>(
       unique: true,
       index: true,
     },
+
     status: {
       type: String,
       enum: ['free', 'occupied'],
       default: 'free',
+      index: true,
     },
+
     currentOrderId: {
       type: Schema.Types.ObjectId,
       ref: 'Order',
       default: null,
+      index: true,
     },
   },
   { timestamps: true },

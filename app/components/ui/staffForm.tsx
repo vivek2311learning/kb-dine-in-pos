@@ -82,7 +82,6 @@ export default function StaffForm({ initialData, isEdit = false }: Props) {
       </h1>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-
         <Input
           label="Name"
           value={name}
@@ -112,27 +111,16 @@ export default function StaffForm({ initialData, isEdit = false }: Props) {
         <Select
           label="Role"
           value={role}
-          onChange={(e) =>
-            setRole(e.target.value as Role)
-          }
+          onChange={(e) => setRole(e.target.value as Role)}
         >
           <option value="admin">Admin</option>
           <option value="counter">Counter</option>
           <option value="kitchen">Kitchen</option>
         </Select>
 
-        <Button
-          type="submit"
-          disabled={loading}
-          className="w-full"
-        >
-          {loading
-            ? 'Saving...'
-            : isEdit
-            ? 'Update Staff'
-            : 'Create Staff'}
+        <Button type="submit" disabled={loading} className="w-full">
+          {loading ? 'Saving...' : isEdit ? 'Update Staff' : 'Create Staff'}
         </Button>
-
       </form>
     </Card>
   );
