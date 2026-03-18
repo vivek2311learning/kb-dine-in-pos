@@ -30,7 +30,7 @@ export default function AdminReportsPage() {
 
   return (
     <div className="p-6 md:p-8 space-y-8 max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold">Reports & Analytics</h1>
+      <h1 className="text-3xl font-bold">Reports &amp; Analytics</h1>
 
       {/* ================= REVENUE SUMMARY ================= */}
 
