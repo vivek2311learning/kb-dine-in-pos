@@ -19,13 +19,14 @@ export async function PATCH(
 
     const { id } = await context.params;
 
-    /* VALIDATE ID */
-
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json({ error: 'Invalid order id' }, { status: 400 });
     }
 
-    const order = await Order.findById(id);
+    /* 🔥 MINIMAL FETCH */
+    const order = await Order.findById(id)
+      .select('status tableId')
+      .lean();
 
     if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
@@ -38,19 +39,17 @@ export async function PATCH(
       );
     }
 
-    /* BILL CHECK */
-
+    /* 🔥 BILL CHECK (FAST) */
     const billExists = await Bill.exists({ orderId: id });
 
     if (billExists) {
       return NextResponse.json(
-        { error: 'Cannot abandon after bill generated' },
+        { error: 'Bill already generated' },
         { status: 400 },
       );
     }
 
-    /* CONFIRMED ITEMS CHECK */
-
+    /* 🔥 CONFIRMED CHECK */
     const confirmedExists = await OrderItem.exists({
       orderId: id,
       kitchenStatus: { $ne: 'draft' },
@@ -59,40 +58,39 @@ export async function PATCH(
 
     if (confirmedExists) {
       return NextResponse.json(
-        { error: 'Cannot abandon. Items already confirmed.' },
+        { error: 'Items already confirmed' },
         { status: 400 },
       );
     }
 
-    /* DELETE ONLY DRAFT ITEMS */
-
+    /* 🔥 FAST DELETE */
     await OrderItem.deleteMany({
       orderId: id,
       kitchenStatus: 'draft',
     });
 
-    /* CLOSE ORDER */
+    /* 🔥 CLOSE ORDER */
+    await Order.updateOne(
+      { _id: id },
+      {
+        status: 'closed',
+        closedAt: new Date(),
+        closedReason: 'abandoned',
+      },
+    );
 
-    order.status = 'closed';
-    order.closedAt = new Date();
-    order.closedReason = 'abandoned';
+    /* 🔥 FREE TABLE */
+    if (order.tableId) {
+      await Table.updateOne(
+        { _id: order.tableId },
+        { status: 'free', currentOrderId: null },
+      );
+    }
 
-    await order.save();
+    return NextResponse.json({ success: true });
 
-    /* FREE TABLE */
-
-    await Table.findByIdAndUpdate(order.tableId, {
-      status: 'free',
-      currentOrderId: null,
-    });
-
-    return NextResponse.json({
-      success: true,
-      orderId: id,
-      tableFreed: true,
-    });
   } catch (err) {
-    console.error('Abandon Order Error:', err);
+    console.error('Abandon Error:', err);
 
     return NextResponse.json(
       { error: 'Failed to abandon order' },

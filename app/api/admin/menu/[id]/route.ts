@@ -1,20 +1,19 @@
-export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/app/lib/db';
 import MenuItem from '@/app/lib/models/MenuItem';
-import mongoose from 'mongoose';
 import { requireRole } from '@/app/lib/auth/requireRole';
+import mongoose from 'mongoose';
 
 export async function PATCH(
   req: Request,
-  context: { params: Promise<{ id: string }> },
+  context: { params: { id: string } },
 ) {
   try {
     await requireRole(['admin']);
     await connectDB();
 
-    const { id } = await context.params;
+    const { id } = context.params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -25,31 +24,23 @@ export async function PATCH(
 
     const body = await req.json();
 
-    const item = await MenuItem.findById(id);
+    const update: any = {};
 
-    if (!item) {
-      return NextResponse.json(
-        { error: 'Menu item not found' },
-        { status: 404 },
-      );
-    }
-
-    /* STATUS ACTIONS */
-
+    /* STATUS ACTION */
     if (body.action) {
       switch (body.action) {
         case 'activate':
-          item.status = 'active';
-          item.archivedAt = undefined;
+          update.status = 'active';
+          update.archivedAt = null;
           break;
 
         case 'disable':
-          item.status = 'unavailable';
+          update.status = 'unavailable';
           break;
 
         case 'archive':
-          item.status = 'archived';
-          item.archivedAt = new Date();
+          update.status = 'archived';
+          update.archivedAt = new Date();
           break;
 
         default:
@@ -58,23 +49,32 @@ export async function PATCH(
             { status: 400 },
           );
       }
-
-      await item.save();
-
-      return NextResponse.json({
-        success: true,
-        item,
-      });
     }
 
     /* NORMAL UPDATE */
+    if (body.name) update.name = body.name.trim();
+    if (body.description) update.description = body.description.trim();
+    if (body.price) update.price = Number(body.price);
+    if (body.category) update.category = body.category;
 
-    const updated = await MenuItem.findByIdAndUpdate(id, body, { new: true });
+    const item = await MenuItem.findByIdAndUpdate(
+      id,
+      update,
+      { new: true }
+    ).lean();
+
+    if (!item) {
+      return NextResponse.json(
+        { error: 'Menu item not found' },
+        { status: 404 },
+      );
+    }
 
     return NextResponse.json({
       success: true,
-      item: updated,
+      item,
     });
+
   } catch (err) {
     console.error('Menu Update Error:', err);
 
@@ -87,13 +87,13 @@ export async function PATCH(
 
 export async function DELETE(
   req: Request,
-  context: { params: Promise<{ id: string }> },
+  context: { params: { id: string } },
 ) {
   try {
     await requireRole(['admin']);
     await connectDB();
 
-    const { id } = await context.params;
+    const { id } = context.params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -102,15 +102,26 @@ export async function DELETE(
       );
     }
 
-    const result = await MenuItem.deleteOne({ _id: id });
+    const item = await MenuItem.findByIdAndUpdate(
+      id,
+      {
+        status: 'archived',
+        archivedAt: new Date(),
+      },
+      { new: true }
+    );
 
-    if (!result.deletedCount) {
-      return NextResponse.json({ error: 'Item not deleted' }, { status: 400 });
+    if (!item) {
+      return NextResponse.json(
+        { error: 'Item not found' },
+        { status: 404 },
+      );
     }
 
     return NextResponse.json({
       success: true,
     });
+
   } catch (err) {
     console.error('Menu Delete Error:', err);
 

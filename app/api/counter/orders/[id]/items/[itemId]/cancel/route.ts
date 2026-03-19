@@ -1,4 +1,3 @@
-export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/app/lib/db';
@@ -6,76 +5,60 @@ import OrderItem from '@/app/lib/models/orderItem';
 import mongoose from 'mongoose';
 import { requireRole } from '@/app/lib/auth/requireRole';
 
-export async function PATCH(
-  req: Request,
-  context: { params: Promise<{ itemId: string }> },
-) {
+export const dynamic = 'force-dynamic';
+
+export async function PATCH(req: Request, context: any) {
   try {
     await requireRole(['counter', 'admin']);
     await connectDB();
 
     const { itemId } = await context.params;
 
-    /* VALIDATE ID */
-
     if (!mongoose.Types.ObjectId.isValid(itemId)) {
-      return NextResponse.json({ error: 'Invalid item id' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
     }
 
-    const item = await OrderItem.findById(itemId);
+    /* 🔥 GET MINIMAL DATA */
+    const item = await OrderItem.findById(itemId)
+      .select('kitchenStatus served cancelled')
+      .lean();
 
     if (!item) {
       return NextResponse.json({ error: 'Item not found' }, { status: 404 });
     }
 
-    /* ALREADY CANCELLED */
-
     if (item.cancelled) {
-      return NextResponse.json(
-        { error: 'Item already cancelled' },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: 'Already cancelled' }, { status: 400 });
     }
-
-    /* SERVED ITEMS CANNOT BE CANCELLED */
 
     if (item.served) {
-      return NextResponse.json(
-        { error: 'Served item cannot be cancelled' },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: 'Served item' }, { status: 400 });
     }
 
-    /* DRAFT ITEM → DELETE */
-
+    /* 🔥 DRAFT → DELETE */
     if (item.kitchenStatus === 'draft') {
-      await item.deleteOne();
-
-      return NextResponse.json({
-        deleted: true,
-        itemId,
-      });
+      await OrderItem.deleteOne({ _id: itemId });
+      return NextResponse.json({ deleted: true });
     }
 
-    /* NORMAL CANCEL */
+    /* 🔥 ATOMIC UPDATE */
+    await OrderItem.updateOne(
+      { _id: itemId },
+      {
+        cancelled: true,
+        billable: false,
+        cancelStage: item.kitchenStatus,
+        cancelledAt: new Date(),
+      },
+    );
 
-    item.cancelled = true;
-    item.billable = false;
-    item.cancelStage = item.kitchenStatus;
-    item.cancelledAt = new Date();
+    return NextResponse.json({ success: true });
 
-    await item.save();
-
-    return NextResponse.json({
-      success: true,
-      itemId,
-      cancelledStage: item.cancelStage,
-    });
   } catch (err) {
-    console.error('Cancel Item Error:', err);
+    console.error(err);
 
     return NextResponse.json(
-      { error: 'Failed to cancel item' },
+      { error: 'Cancel failed' },
       { status: 500 },
     );
   }

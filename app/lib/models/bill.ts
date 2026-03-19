@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document, Model } from 'mongoose';
+import mongoose, { Schema, Model, Document } from 'mongoose';
 
 export interface IBill extends Document {
   billNumber: number;
@@ -9,67 +9,40 @@ export interface IBill extends Document {
   discount: number;
   totalAmount: number;
 
-  printedAt: Date;
+  paidAmount: number; // ✅ NEW
 
-  paidAt?: Date;
+  printedAt?: Date;
+
   isPaid: boolean;
+  paidAt?: Date;
 
   isRefunded: boolean;
-  refundAt?: Date;
-  refundReason?: string;
   refundAmount?: number;
-  refundedBy?: mongoose.Types.ObjectId;
 }
 
 const BillSchema = new Schema<IBill>(
   {
-    billNumber: {
-      type: Number,
-      required: true,
-      unique: true,
-      index: true,
-    },
+    billNumber: { type: Number, required: true, unique: true },
 
-    orderId: {
-      type: Schema.Types.ObjectId,
-      ref: 'Order',
-      required: true,
-      index: true,
-    },
+    orderId: { type: Schema.Types.ObjectId, ref: 'Order', required: true },
 
-    subtotal: { type: Number, required: true },
+    subtotal: Number,
+    tax: Number,
+    discount: Number,
+    totalAmount: Number,
 
-    tax: { type: Number, default: 0 },
+    paidAmount: { type: Number, default: 0 }, // ✅ important
 
-    discount: { type: Number, default: 0 },
+    printedAt: Date,
 
-    totalAmount: { type: Number, required: true },
+    isPaid: { type: Boolean, default: false },
+    paidAt: Date,
 
-    printedAt: { type: Date, default: Date.now },
-
-    paidAt: { type: Date },
-
-    isPaid: { type: Boolean, default: false, index: true },
-
-    isRefunded: { type: Boolean, default: false, index: true },
-
-    refundAt: { type: Date },
-
-    refundReason: { type: String },
-
-    refundAmount: { type: Number },
-
-    refundedBy: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-    },
+    isRefunded: { type: Boolean, default: false },
+    refundAmount: Number,
   },
   { timestamps: true },
 );
 
-/* Performance */
-
-BillSchema.index({ orderId: 1 });
-
-export default (mongoose.models.Bill as Model<IBill>) ||
+export default mongoose.models.Bill ||
   mongoose.model<IBill>('Bill', BillSchema);

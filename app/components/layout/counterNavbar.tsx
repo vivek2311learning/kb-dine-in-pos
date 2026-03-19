@@ -6,7 +6,7 @@ import { useState } from 'react';
 
 const NAV = [
   { label: 'Tables', href: '/counter/tables' },
-  { label: 'Orders', href: '/counter/orders' },
+  { label: 'Orders', href: '/counter/unserved' },
 ];
 
 export function CounterNavbar() {
@@ -21,7 +21,7 @@ export function CounterNavbar() {
         method: 'POST',
       });
 
-      router.replace('/login');
+      router.replace('/');
       router.refresh();
     } catch (err) {
       console.error('Logout failed', err);

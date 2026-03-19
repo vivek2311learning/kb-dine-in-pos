@@ -1,58 +1,142 @@
 export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
+import mongoose from 'mongoose';
+
 import { connectDB } from '@/app/lib/db';
-import Order from '@/app/lib/models/order';
+
 import Bill from '@/app/lib/models/bill';
-import { requireRole } from '@/app/lib/auth/requireRole';
+import Order from '@/app/lib/models/order';
+import Table from '@/app/lib/models/Table';
 
 export async function GET(req: Request) {
   try {
-    await requireRole(['admin']);
     await connectDB();
 
     const { searchParams } = new URL(req.url);
 
-    const status = searchParams.get('status');
+    const page = Number(searchParams.get('page') || 1);
+    const limit = Number(searchParams.get('limit') || 10);
 
-    const query: any = {};
+    const billNumber = searchParams.get('billNumber');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
 
-    if (status) query.status = status;
+    const skip = (page - 1) * limit;
 
-    const orders = await Order.find(query)
-      .populate('tableId', 'tableNumber')
-      .sort({ closedAt: -1 });
+    /* 🔥 FILTER */
+    const query: any = { isPaid: true };
 
-    const bills = await Bill.find({
-      orderId: { $in: orders.map((o) => o._id) },
-    });
+    if (billNumber) {
+      query.billNumber = Number(billNumber);
+    }
 
-    const result = orders.map((order) => {
-      const bill = bills.find(
-        (b) => b.orderId.toString() === order._id.toString(),
-      );
+    if (startDate || endDate) {
+      query.createdAt = {};
+
+      if (startDate) query.createdAt.$gte = new Date(startDate);
+
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = end;
+      }
+    }
+
+    /* 🔥 BILLS */
+    const [bills, total] = await Promise.all([
+      Bill.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .select('orderId billNumber totalAmount isPaid createdAt')
+        .lean(),
+
+      Bill.countDocuments(query),
+    ]);
+
+    /* 🔥 ORDERS */
+    const orderIds = bills.map((b) => b.orderId);
+
+    const orders = await Order.find({
+      _id: { $in: orderIds },
+    })
+      .select('tableId parcelNumber type openedAt closedAt')
+      .lean();
+
+    /* 🔥 TABLE IDS CLEAN */
+    const tableIds = orders
+  .map((o) => {
+    if (!o.tableId) return null;
+
+    // अगर populated object है
+    if (typeof o.tableId === 'object') {
+      return o.tableId._id;
+    }
+
+    return o.tableId;
+  })
+  .filter(
+    (id) =>
+      id &&
+      mongoose.Types.ObjectId.isValid(id.toString())
+  );
+
+    const tables = await Table.find({
+      _id: { $in: tableIds },
+    })
+      .select('tableNumber')
+      .lean();
+
+    /* 🔥 MAP (FAST) */
+    const orderMap = new Map();
+    orders.forEach(o => orderMap.set(o._id.toString(), o));
+
+    const tableMap = new Map();
+    tables.forEach(t => tableMap.set(t._id.toString(), t));
+
+    const result = bills.map((bill) => {
+      const order: any = orderMap.get(bill.orderId.toString());
+
+      let tableNumber = null;
+      let parcelNumber = null;
+
+      if (order?.type === 'dine-in' && order.tableId) {
+        const table = tableMap.get(order.tableId.toString());
+        tableNumber = table?.tableNumber || null;
+      }
+
+      if (order?.type === 'parcel') {
+        parcelNumber = order?.parcelNumber || null;
+      }
 
       return {
-        _id: order._id,
-
-        status: order.status,
-
-        table: order.tableId,
-
-        openedAt: order.createdAt,
-        closedAt: order.closedAt,
-
-        billNumber: bill?.billNumber || null,
-
-        totalAmount: bill?.totalAmount || 0,
-
-        isPaid: bill?.isPaid || false,
+        _id: order?._id,
+        billNumber: bill.billNumber,
+        totalAmount: bill.totalAmount,
+        isPaid: bill.isPaid,
+        orderType: order?.type,
+        tableNumber,
+        parcelNumber,
+        openedAt: order?.openedAt,
+        closedAt: order?.closedAt,
       };
     });
 
-    return NextResponse.json(result);
-  } catch (err: any) {
-    console.error(err);
+    return NextResponse.json({
+      data: result,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    });
 
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: any) {
+    console.error('Admin Orders Error:', err);
+
+    return NextResponse.json(
+      { error: err.message },
+      { status: 500 },
+    );
   }
 }

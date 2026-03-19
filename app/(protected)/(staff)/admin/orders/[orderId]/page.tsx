@@ -22,9 +22,8 @@ interface Order {
   _id: string;
   status: string;
 
-  table: {
-    tableNumber: number;
-  };
+  tableNumber?: number | null;
+  parcelNumber?: number | null;
 
   openedAt: string;
   closedAt?: string;
@@ -33,7 +32,6 @@ interface Order {
   isPaid?: boolean;
 
   payments: Payment[];
-
   items: Item[];
 }
 
@@ -95,9 +93,14 @@ export default function AdminOrderDetailPage() {
 
       <Card className="p-4 space-y-2 md:mx-24">
         <p>
-          <strong>Table:</strong> {order.table?.tableNumber}
-        </p>
-
+  <strong>
+    {order?.tableNumber != null
+      ? `Table ${order.tableNumber}`
+      : order?.parcelNumber != null
+      ? `Parcel #${order.parcelNumber}`
+      : '-'}
+  </strong>
+</p>
         <p>
           <strong>Bill #:</strong> {order.billNumber || '-'}
         </p>

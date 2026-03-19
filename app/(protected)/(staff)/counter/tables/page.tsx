@@ -19,92 +19,109 @@ export default function TablesPage() {
 
   const [tables, setTables] = useState<Table[]>([]);
   const [loading, setLoading] = useState(true);
-  const [processing, setProcessing] = useState(false);
-  const [fetching, setFetching] = useState(false);
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
-  /* ---------------- FETCH TABLES ---------------- */
+  /* ================= FETCH ================= */
 
   const fetchTables = async () => {
-    if (fetching) return;
-    setFetching(true);
-
     try {
-      const res = await fetch('/api/counter/tables');
+      const res = await fetch('/api/counter/tables', {
+        cache: 'no-store',
+        credentials: 'include',
+      });
 
-      if (!res.ok) throw new Error('Failed to fetch tables');
+      if (!res.ok) return;
 
       const data = await res.json();
 
-      setTables(data);
+      /* 🔥 SMART UPDATE (NO UNNECESSARY RERENDER) */
+      setTables((prev) => {
+        const same =
+          prev.length === data.length &&
+          prev.every(
+            (t, i) =>
+              t._id === data[i]._id &&
+              t.status === data[i].status &&
+              t.currentOrderId === data[i].currentOrderId
+          );
+
+        return same ? prev : data;
+      });
+
     } catch (err) {
       console.error(err);
     } finally {
-      setFetching(false);
       setLoading(false);
     }
   };
 
+  /* ================= POLLING ================= */
+
   useEffect(() => {
     fetchTables();
 
-    const onFocus = () => fetchTables();
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchTables();
+      }
+    }, 5000); // ✅ optimized polling
 
-    window.addEventListener('focus', onFocus);
-
-    return () => {
-      window.removeEventListener('focus', onFocus);
-    };
+    return () => clearInterval(interval);
   }, []);
 
-  /* ---------------- TABLE CLICK ---------------- */
+  /* ================= CLICK ================= */
 
   const handleClick = async (table: Table) => {
-    if (processing) return;
-    setProcessing(true);
+    /* 🔥 SAME TABLE DOUBLE CLICK BLOCK */
+    if (processingId === table._id) return;
+
+    setProcessingId(table._id);
 
     try {
+      /* 🚀 FREE → CREATE ORDER */
       if (table.status === 'free') {
         const res = await fetch('/api/counter/orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tableId: table._id }),
+          credentials: 'include',
         });
 
         if (!res.ok) return;
 
         const data = await res.json();
+        const orderId = data._id || data.order?._id;
 
-        const orderId = data.order?._id || data._id;
-
-        router.push(`/counter/tables/${table._id}/order?orderId=${orderId}`);
-
+        router.push(`/counter/orders/${orderId}`);
         return;
       }
 
+      /* 🚀 OCCUPIED → OPEN */
       if (table.currentOrderId) {
-        router.push(
-          `/counter/tables/${table._id}/order?orderId=${table.currentOrderId}`,
-        );
+        router.push(`/counter/orders/${table.currentOrderId}`);
       }
+
+    } catch (err) {
+      console.error(err);
     } finally {
-      setProcessing(false);
+      /* 🔥 DELAY RESET (PREVENT DOUBLE CLICK BUG) */
+      setTimeout(() => setProcessingId(null), 800);
     }
   };
 
-  /* ---------------- UI ---------------- */
+  /* ================= UI ================= */
 
   if (loading) {
     return (
-      <div className="p-6 text-center text-gray-500">Loading tables...</div>
+      <div className="p-6 text-center text-gray-500">
+        Loading tables...
+      </div>
     );
-  }
-
-  if (!tables.length) {
-    return <div className="p-6 text-center text-gray-500">No tables found</div>;
   }
 
   return (
     <div className="p-4 md:p-6">
+
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-xl md:text-2xl font-bold">Tables</h1>
 
@@ -112,37 +129,46 @@ export default function TablesPage() {
           onClick={() => router.push('/counter/parcel')}
           className="bg-black text-white"
         >
-          + Parcel Order
+          Parcel Order
         </Button>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-        {tables.map((table) => (
-          <Card
-            key={table._id}
-            onClick={() => handleClick(table)}
-            className={`
-          p-5
-          cursor-pointer
-          text-center
-          transition
-          hover:shadow-lg
-          active:scale-95
-          ${
-            table.status === 'free'
-              ? 'bg-green-50 border-green-300'
-              : 'bg-red-50 border-red-300'
-          }
-        `}
-          >
-            <h2 className="text-lg md:text-xl font-bold mb-2">
-              Table {table.tableNumber}
-            </h2>
 
-            <Badge>{table.status === 'free' ? 'Free' : 'Occupied'}</Badge>
-          </Card>
-        ))}
+        {tables.map((table) => {
+          const isProcessing = processingId === table._id;
+
+          return (
+            <Card
+              key={table._id}
+              onClick={() => handleClick(table)}
+              className={`
+                p-5 text-center transition active:scale-95
+                ${
+                  isProcessing
+                    ? 'opacity-50 pointer-events-none'
+                    : 'cursor-pointer hover:shadow-lg'
+                }
+                ${
+                  table.status === 'free'
+                    ? 'bg-green-50 border-green-300'
+                    : 'bg-red-50 border-red-300'
+                }
+              `}
+            >
+              <h2 className="text-lg font-bold mb-2">
+                Table {table.tableNumber}
+              </h2>
+
+              <Badge>
+                {table.status === 'free' ? 'Free' : 'Occupied'}
+              </Badge>
+            </Card>
+          );
+        })}
+
       </div>
+
     </div>
   );
 }

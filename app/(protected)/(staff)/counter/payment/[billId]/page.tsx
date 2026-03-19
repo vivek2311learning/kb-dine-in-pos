@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type PaymentMethod = 'cash' | 'upi' | 'card';
 
@@ -11,27 +11,26 @@ interface PaymentRow {
 }
 
 export default function PaymentPage() {
-  const params = useParams<{ billId: string; tableId: string }>();
+  const params = useParams<{ billId: string }>();
   const router = useRouter();
 
   const billId = params.billId;
-  const tableId = params.tableId;
 
   const [totalAmount, setTotalAmount] = useState(0);
-
-  const [payments, setPayments] = useState<PaymentRow[]>([
-    { method: 'cash', amount: 0 },
-  ]);
-
+  const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [loading, setLoading] = useState(false);
 
-  /* ---------------- FETCH BILL ---------------- */
+  /* ================= FETCH BILL ================= */
 
   useEffect(() => {
     if (!billId) return;
 
-    const fetchBill = async () => {
-      const res = await fetch(`/api/counter/bills/${billId}`);
+    const load = async () => {
+      const res = await fetch(`/api/counter/bills/${billId}`, {
+        cache: 'no-store',
+        credentials: 'include',
+      });
+
       const data = await res.json();
 
       if (res.ok && data?.bill?.totalAmount) {
@@ -41,54 +40,61 @@ export default function PaymentPage() {
       }
     };
 
-    fetchBill();
+    load();
   }, [billId]);
 
-  /* ---------------- CALCULATIONS ---------------- */
+  /* ================= CALCULATIONS ================= */
 
-  const paidAmount = payments.reduce(
-    (sum, p) => sum + Number(p.amount || 0),
-    0,
+  const paidAmount = useMemo(
+    () => payments.reduce((sum, p) => sum + Number(p.amount || 0), 0),
+    [payments],
   );
 
-  const remaining = totalAmount - paidAmount;
+  const remaining = useMemo(
+    () => totalAmount - paidAmount,
+    [totalAmount, paidAmount],
+  );
 
-  /* ---------------- UPDATE FUNCTIONS ---------------- */
+  /* ================= HELPERS ================= */
 
-  const updateMethod = (index: number, value: PaymentMethod) => {
+  const updateMethod = (i: number, method: PaymentMethod) => {
     const updated = [...payments];
-    updated[index].method = value;
-
+    updated[i].method = method;
     setPayments(updated);
   };
 
-  const updateAmount = (index: number, value: number) => {
+  const updateAmount = (i: number, amount: number) => {
     const updated = [...payments];
-    updated[index].amount = value;
-
+    updated[i].amount = amount;
     setPayments(updated);
   };
 
-  const addPaymentRow = () => {
+  const addSplit = () => {
     setPayments([...payments, { method: 'cash', amount: 0 }]);
   };
 
-  /* ---------------- COMPLETE PAYMENT ---------------- */
+  const fillFull = (method: PaymentMethod) => {
+    setPayments([{ method, amount: totalAmount }]);
+  };
 
-  const handlePayment = async () => {
-    if (!billId) return;
+  /* ================= PAYMENT ================= */
 
-    if (remaining !== 0) {
-      alert('Payment total mismatch');
-      return;
-    }
+const handlePayment = async () => {
+  if (!billId || loading) return;
 
+  if (remaining !== 0) {
+    alert('Amount mismatch');
+    return;
+  }
+
+  try {
     setLoading(true);
 
     const res = await fetch(`/api/counter/bills/${billId}/pay`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ payments }),
+      credentials: 'include',
     });
 
     const data = await res.json();
@@ -99,52 +105,51 @@ export default function PaymentPage() {
       return;
     }
 
-    const billRes = await fetch(`/api/counter/bills/${billId}`);
-    const billData = await billRes.json();
-
-    const orderId = billData?.bill?.orderId;
-
+    /* 🔥 IMPORTANT FIX */
     setLoading(false);
 
-    if (!orderId) {
-      alert('Order not found');
-      return;
-    }
+    /* 🔥 SAFE REDIRECT */
+    router.replace(`/counter/feedback/${data.orderId}`);
 
-    router.push(`/counter/tables/${tableId}/feedback/${orderId}`);
-  };
+  } catch (err) {
+    console.error(err);
+    setLoading(false);
+  }
+};
 
-  /* ---------------- UI ---------------- */
+  /* ================= UI ================= */
 
   return (
-    <div className="p-8 max-w-xl mx-auto space-y-6">
-      <h1 className="text-3xl font-bold text-center">Payment</h1>
+    <div className="p-4 md:p-6 max-w-xl mx-auto space-y-5">
 
-      {/* TOTAL CARD */}
+      <h1 className="text-2xl font-bold text-center">
+        Payment
+      </h1>
 
-      <div className="border rounded-xl p-6 text-center">
-        <p className="text-sm">Total Amount</p>
-
+      <div className="border rounded-xl p-5 text-center bg-white">
+        <p className="text-sm text-gray-500">Total Amount</p>
         <p className="text-3xl font-bold mt-1">₹{totalAmount}</p>
       </div>
 
-      {/* PAYMENT ROWS */}
+      <div className="grid grid-cols-3 gap-2">
+        <button onClick={() => fillFull('cash')} className="bg-gray-200 py-2 rounded-lg">Cash</button>
+        <button onClick={() => fillFull('upi')} className="bg-gray-200 py-2 rounded-lg">UPI</button>
+        <button onClick={() => fillFull('card')} className="bg-gray-200 py-2 rounded-lg">Card</button>
+      </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {payments.map((p, i) => (
-          <div key={i} className="border rounded-xl p-4 grid grid-cols-2 gap-4">
+          <div key={i} className="border rounded-xl p-3 grid grid-cols-2 gap-3 bg-white">
+
             <div>
-              <label className="text-sm font-medium" htmlFor={`method-${i}`}>
+              <label htmlFor={`method-${i}`} className="text-xs text-gray-500">
                 Method
               </label>
-
               <select
                 id={`method-${i}`}
                 value={p.method}
-                onChange={(e) =>
-                  updateMethod(i, e.target.value as PaymentMethod)
-                }
-                className="border rounded-lg p-2 w-full mt-1"
+                onChange={(e) => updateMethod(i, e.target.value as PaymentMethod)}
+                className="border p-2 rounded-lg w-full mt-1"
               >
                 <option value="cash">Cash</option>
                 <option value="upi">UPI</option>
@@ -153,57 +158,48 @@ export default function PaymentPage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium" htmlFor={`amount-${i}`}>
+              <label htmlFor={`amount-${i}`} className="text-xs text-gray-500">
                 Amount
               </label>
-
               <input
                 id={`amount-${i}`}
                 type="number"
                 value={p.amount}
                 onChange={(e) => updateAmount(i, Number(e.target.value))}
-                className="border rounded-lg p-2 w-full mt-1"
+                className="border p-2 rounded-lg w-full mt-1"
               />
             </div>
+
           </div>
         ))}
       </div>
 
-      {/* ADD SPLIT */}
-
-      <button
-        onClick={addPaymentRow}
-        className="w-full py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
-      >
-        + Add Split Payment
+      <button onClick={addSplit} className="w-full py-2 bg-gray-100 rounded-lg">
+        + Split Payment
       </button>
 
-      {/* SUMMARY */}
-
-      <div className="border rounded-xl p-4 space-y-2">
-        <div className="flex justify-between">
+      <div className="border rounded-xl p-4 bg-white">
+        <div className="flex justify-between text-sm">
           <span>Paid</span>
           <span>₹{paidAmount}</span>
         </div>
 
-        <div className="flex justify-between font-semibold text-lg">
+        <div className="flex justify-between font-bold text-lg mt-2">
           <span>Remaining</span>
-
           <span className={remaining === 0 ? 'text-green-600' : 'text-red-600'}>
             ₹{remaining}
           </span>
         </div>
       </div>
 
-      {/* COMPLETE PAYMENT */}
-
       <button
         onClick={handlePayment}
         disabled={loading || remaining !== 0}
-        className="w-full py-3 bg-green-600 text-white rounded-xl text-lg font-semibold hover:bg-green-700 transition"
+        className="w-full py-3 bg-green-600 text-white rounded-xl text-lg font-semibold"
       >
         {loading ? 'Processing...' : 'Complete Payment'}
       </button>
+
     </div>
   );
 }

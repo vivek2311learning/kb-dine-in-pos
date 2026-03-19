@@ -24,16 +24,18 @@ export default function TablePage() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
 
-  /* ---------------- FETCH TABLE ---------------- */
+  /* FETCH */
 
   const fetchTable = async () => {
     try {
-      const res = await fetch(`/api/tables/${tableId}`);
+      const res = await fetch(`/api/counter/tables/${tableId}`, {
+        cache: 'no-store',
+        credentials: 'include',
+      });
 
-      if (!res.ok) throw new Error('Failed to fetch table');
+      if (!res.ok) return;
 
       const data = await res.json();
-
       setTable(data);
     } catch (err) {
       console.error(err);
@@ -43,10 +45,20 @@ export default function TablePage() {
   };
 
   useEffect(() => {
-    if (tableId) fetchTable();
+    if (!tableId) return;
+
+    fetchTable();
+
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchTable();
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, [tableId]);
 
-  /* ---------------- OPEN ORDER ---------------- */
+  /* ACTION */
 
   const handleOpenOrder = async () => {
     if (!table || processing) return;
@@ -54,28 +66,26 @@ export default function TablePage() {
     setProcessing(true);
 
     try {
-      /* OCCUPIED TABLE */
-
+      /* OCCUPIED */
       if (table.status === 'occupied' && table.currentOrderId) {
-        router.push(
-          `/counter/tables/${tableId}/order?orderId=${table.currentOrderId}`,
-        );
+        router.push(`/counter/orders/${table.currentOrderId}`);
         return;
       }
 
-      /* FREE TABLE → CREATE ORDER */
-
+      /* CREATE */
       const res = await fetch('/api/counter/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tableId }),
+        credentials: 'include',
       });
 
-      if (!res.ok) throw new Error('Failed to create order');
+      if (!res.ok) return;
 
-      const newOrder = await res.json();
+      const data = await res.json();
 
-      router.push(`/counter/tables/${tableId}/order?orderId=${newOrder._id}`);
+      router.push(`/counter/orders/${data._id}`);
+
     } catch (err) {
       console.error(err);
     } finally {
@@ -83,12 +93,10 @@ export default function TablePage() {
     }
   };
 
-  /* ---------------- UI ---------------- */
+  /* UI */
 
   if (loading) {
-    return (
-      <div className="p-6 text-center text-gray-500">Loading table...</div>
-    );
+    return <div className="p-6 text-center text-gray-500">Loading table...</div>;
   }
 
   if (!table) {
@@ -97,11 +105,17 @@ export default function TablePage() {
 
   return (
     <div className="p-6 max-w-xl mx-auto">
-      <Card className="p-6 space-y-4">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Table {table.tableNumber}</h1>
 
-          <Badge>{table.status === 'free' ? 'Free' : 'Occupied'}</Badge>
+      <Card className="p-6 space-y-4">
+
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold">
+            Table {table.tableNumber}
+          </h1>
+
+          <Badge>
+            {table.status === 'free' ? 'Free' : 'Occupied'}
+          </Badge>
         </div>
 
         <Button
@@ -112,10 +126,12 @@ export default function TablePage() {
           {processing
             ? 'Opening...'
             : table.status === 'free'
-              ? 'Start New Order'
-              : 'View Current Order'}
+            ? 'Start New Order'
+            : 'View Current Order'}
         </Button>
+
       </Card>
+
     </div>
   );
 }

@@ -10,7 +10,6 @@ import { requireRole } from '@/app/lib/auth/requireRole';
 export async function POST(req: Request) {
   try {
     await requireRole(['counter', 'admin']);
-
     await connectDB();
 
     const { tableId } = await req.json();
@@ -19,41 +18,47 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid table id' }, { status: 400 });
     }
 
-    const table = await Table.findById(tableId);
+    /* 🔥 SINGLE QUERY (TABLE + ORDER CHECK) */
+    const table = await Table.findById(tableId)
+      .select('currentOrderId status')
+      .lean();
 
     if (!table) {
       return NextResponse.json({ error: 'Table not found' }, { status: 404 });
     }
 
-    /* Prevent duplicate running order */
-
+    /* ✅ CHECK EXISTING */
     if (table.currentOrderId) {
-      const runningOrder = await Order.findOne({
+      const existing = await Order.findOne({
         _id: table.currentOrderId,
         status: 'running',
-      }).lean();
+      })
+        .select('_id tableId type status')
+        .lean();
 
-      if (runningOrder) {
-        return NextResponse.json(runningOrder);
+      if (existing) {
+        return NextResponse.json(existing);
       }
     }
 
-    /* Create order */
-
+    /* ✅ CREATE ORDER */
     const order = await Order.create({
       tableId,
       type: 'dine-in',
       status: 'running',
     });
 
-    /* Update table */
-
-    table.status = 'occupied';
-    table.currentOrderId = order._id;
-
-    await table.save();
+    /* 🔥 FAST UPDATE (NO FETCH AGAIN) */
+    await Table.updateOne(
+      { _id: tableId },
+      {
+        status: 'occupied',
+        currentOrderId: order._id,
+      },
+    );
 
     return NextResponse.json(order);
+
   } catch (err: any) {
     console.error('Create Order Error:', err);
 

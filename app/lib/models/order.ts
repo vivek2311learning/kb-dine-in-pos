@@ -7,6 +7,8 @@ export interface IOrder extends Document {
 
   parcelNumber?: number;
 
+  parcelDelivered?: boolean;
+
   status: 'running' | 'billed' | 'paid' | 'closed';
 
   openedAt: Date;
@@ -16,22 +18,17 @@ export interface IOrder extends Document {
   closedReason?: 'completed' | 'abandoned';
 
   createdAt: Date;
-
   updatedAt: Date;
 }
 
 const OrderSchema = new Schema<IOrder>(
   {
-    /* Table (only for dine-in) */
-
     tableId: {
       type: Schema.Types.ObjectId,
       ref: 'Table',
       default: null,
       index: true,
     },
-
-    /* Order Type */
 
     type: {
       type: String,
@@ -40,14 +37,16 @@ const OrderSchema = new Schema<IOrder>(
       index: true,
     },
 
-    /* Parcel Number (only for parcel orders) */
-
     parcelNumber: {
       type: Number,
       index: true,
     },
 
-    /* Order Lifecycle */
+    parcelDelivered: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
 
     status: {
       type: String,
@@ -56,27 +55,18 @@ const OrderSchema = new Schema<IOrder>(
       index: true,
     },
 
-    /* When order started */
-
     openedAt: {
       type: Date,
       default: Date.now,
     },
 
-    /* When order finished */
-
-    closedAt: {
-      type: Date,
-    },
-
-    /* Why closed */
+    closedAt: Date,
 
     closedReason: {
       type: String,
       enum: ['completed', 'abandoned'],
     },
   },
-
   {
     timestamps: true,
   },

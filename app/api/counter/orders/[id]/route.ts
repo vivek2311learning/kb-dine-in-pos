@@ -21,27 +21,27 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid order id' }, { status: 400 });
     }
 
-    /* Fetch order */
+    /* 🔥 PARALLEL FETCH */
+    const [order, items] = await Promise.all([
+      Order.findById(id)
+        .select('_id type status tableId parcelNumber')
+        .lean(),
 
-    const order = await Order.findById(id).lean();
+      OrderItem.find({
+        orderId: id,
+        cancelled: false,
+      })
+        .select('_id nameSnapshot priceSnapshot quantity kitchenStatus served')
+        .sort({ createdAt: 1 })
+        .lean(),
+    ]);
 
     if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
-    /* Fetch order items */
+    return NextResponse.json({ order, items });
 
-    const items = await OrderItem.find({
-      orderId: id,
-      cancelled: { $ne: true },
-    })
-      .sort({ createdAt: 1 })
-      .lean();
-
-    return NextResponse.json({
-      order,
-      items,
-    });
   } catch (err: any) {
     console.error('Order Fetch Error:', err);
 

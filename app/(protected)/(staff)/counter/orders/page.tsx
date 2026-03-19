@@ -1,12 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useParams, useSearchParams, useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 
 import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
-import { useNotification } from '@/app/components/notification/provider';
+import { Select } from '@/app/components/ui/select';
+
+interface MenuItem {
+  _id: string;
+  name: string;
+  price: number;
+  category: string;
+}
 
 interface OrderItem {
   _id: string;
@@ -18,125 +25,183 @@ interface OrderItem {
   cancelled?: boolean;
 }
 
-interface MenuItem {
+interface Order {
   _id: string;
-  name: string;
-  price: number;
-  category: string;
+  type: 'dine-in' | 'parcel';
+  parcelNumber?: number;
+  tableId?: { tableNumber: number };
 }
 
 export default function OrderPage() {
   const params = useParams();
-  const searchParams = useSearchParams();
   const router = useRouter();
 
-  const tableId = params.tableId as string;
-  const orderId = searchParams.get('orderId');
+  const orderId = params.orderId as string;
 
-  const { show } = useNotification();
-
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [order, setOrder] = useState<Order | null>(null);
+  const [items, setItems] = useState<OrderItem[]>([]);
+  const [menu, setMenu] = useState<MenuItem[]>([]);
 
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  /* ================= FETCH ORDER ================= */
 
   const fetchOrder = async () => {
-    if (!orderId) return;
+    try {
+      const res = await fetch(`/api/counter/orders/${orderId}`, {
+        cache: 'no-store',
+        credentials: 'include',
+      });
 
-    const res = await fetch(`/api/counter/orders/${orderId}`, {
-      cache: 'no-store',
-    });
+      if (!res.ok) return;
 
-    const data = await res.json();
+      const data = await res.json();
 
-    const visible = (data.items || []).filter((i: OrderItem) => !i.cancelled);
+      const visible = (data.items || []).filter(
+        (i: OrderItem) => !i.cancelled,
+      );
 
-    setOrderItems(visible);
-  };
+      setItems((prev) => {
+        const same =
+          prev.length === visible.length &&
+          prev.every(
+            (p, i) =>
+              p._id === visible[i]._id &&
+              p.quantity === visible[i].quantity &&
+              p.kitchenStatus === visible[i].kitchenStatus,
+          );
 
-  const fetchMenu = async () => {
-    const res = await fetch('/api/menu', { cache: 'no-store' });
-    const data = await res.json();
+        return same ? prev : visible;
+      });
 
-    setMenuItems(data);
+      setOrder(data.order);
 
-    if (data.length && !category) {
-      setCategory(data[0].category);
+    } catch (err) {
+      console.error(err);
     }
   };
 
+  /* ================= FETCH MENU ================= */
+
   useEffect(() => {
-    fetchMenu();
+    const load = async () => {
+      const res = await fetch('/api/menu', { credentials: 'include' });
+      const data = await res.json();
+
+      setMenu(data);
+
+      if (data.length && !category) {
+        setCategory(data[0].category);
+      }
+    };
+
+    load();
   }, []);
 
   useEffect(() => {
-    if (!orderId) return;
-
     fetchOrder();
-
-    const interval = setInterval(fetchOrder, 5000);
-
-    return () => clearInterval(interval);
   }, [orderId]);
 
-  const addItem = async (item: MenuItem) => {
-    if (!orderId) return;
+  /* ================= ADD ITEM ================= */
 
-    await fetch(`/api/counter/orders/${orderId}/add`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ menuItemId: item._id }),
-    });
+  const addItem = async (m: MenuItem) => {
+    if (loading) return;
 
-    fetchOrder();
+    setLoading(true);
+
+    try {
+      await fetch(`/api/counter/orders/${orderId}/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ menuItemId: m._id }),
+      });
+
+      await fetchOrder();
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const categories = [...new Set(menuItems.map((i) => i.category))];
+  /* ================= FILTER ================= */
 
-  const filteredMenu = menuItems.filter(
-    (i) =>
-      i.category === category &&
-      i.name.toLowerCase().includes(search.toLowerCase()),
+  const categories = useMemo(
+    () => [...new Set(menu.map((i) => i.category))],
+    [menu],
   );
 
-  const total = orderItems
-    .filter((i) => i.kitchenStatus !== 'draft')
-    .reduce((sum, i) => sum + i.priceSnapshot * i.quantity, 0);
+  const filteredMenu = useMemo(() => {
+    return menu.filter((i) => {
+      if (search.trim()) {
+        return i.name.toLowerCase().includes(search.toLowerCase());
+      }
+      return i.category === category;
+    });
+  }, [menu, category, search]);
+
+  /* ================= TOTAL ================= */
+
+  const total = useMemo(() => {
+    return items
+      .filter((i) => i.kitchenStatus !== 'draft')
+      .reduce((sum, i) => sum + i.priceSnapshot * i.quantity, 0);
+  }, [items]);
+
+  const label = () => {
+    if (order?.type === 'parcel') {
+      return `Parcel #${order.parcelNumber}`;
+    }
+    if (order?.tableId?.tableNumber) {
+      return `Table ${order.tableId.tableNumber}`;
+    }
+    return 'Order';
+  };
+
+  /* ================= CANCEL ================= */
+
+  const cancelOrder = async () => {
+    if (!confirm('Cancel order?')) return;
+
+    await fetch(`/api/counter/orders/${orderId}/cancel`, {
+      method: 'PATCH',
+    });
+
+    router.push(
+      order?.type === 'parcel' ? '/counter/parcel' : '/counter/tables',
+    );
+  };
+
+  /* ================= UI ================= */
 
   return (
-    <div className="h-screen grid grid-cols-1 lg:grid-cols-2 gap-4 p-3 md:p-6">
-      {/* MENU */}
+    <div className="h-screen grid md:grid-cols-2 gap-4 p-4">
 
+      {/* MENU */}
       <div className="space-y-4 overflow-y-auto">
         <h2 className="text-xl font-bold">Menu</h2>
 
         <Input
-          placeholder="Search item..."
+          placeholder="Search..."
           value={search}
           onChange={(e: any) => setSearch(e.target.value)}
         />
 
-        <div className="flex gap-2 overflow-x-auto pb-2">
-          {categories.map((cat) => (
-            <Button
-              key={cat}
-              onClick={() => setCategory(cat)}
-              className={
-                category === cat ? 'bg-black text-white' : 'bg-gray-200'
-              }
-            >
-              {cat}
-            </Button>
+        <Select
+          value={category}
+          onChange={(e: any) => setCategory(e.target.value)}
+        >
+          {categories.map((c) => (
+            <option key={c}>{c}</option>
           ))}
-        </div>
+        </Select>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           {filteredMenu.map((item) => (
             <Card
               key={item._id}
               onClick={() => addItem(item)}
-              className="p-4 cursor-pointer hover:shadow-lg active:scale-95"
+              className="p-3 cursor-pointer hover:shadow-lg"
             >
               <div className="flex justify-between">
                 <span>{item.name}</span>
@@ -148,41 +213,43 @@ export default function OrderPage() {
       </div>
 
       {/* ORDER */}
-
       <div className="border rounded-xl p-4 flex flex-col">
-        <h2 className="text-xl font-bold mb-4">Current Order</h2>
+        <h2 className="text-xl font-bold mb-4">{label()}</h2>
 
         <div className="flex-1 overflow-y-auto space-y-3">
-          {orderItems.map((item) => (
-            <Card key={item._id} className="p-3">
-              <div className="flex justify-between">
-                <div>
-                  <p>{item.nameSnapshot}</p>
-                  <p className="text-xs">{item.kitchenStatus}</p>
-                </div>
-
-                <span>x{item.quantity}</span>
+          {items.map((i) => (
+            <Card key={i._id} className="p-3 flex justify-between">
+              <div>
+                <p>{i.nameSnapshot}</p>
+                <p className="text-xs">{i.kitchenStatus}</p>
               </div>
+              <span>x{i.quantity}</span>
             </Card>
           ))}
         </div>
 
-        <div className="border-t pt-4 mt-4 sticky bottom-0 bg-white">
+        <div className="border-t pt-4">
           <div className="flex justify-between font-bold">
             <span>Total</span>
             <span>₹{total}</span>
           </div>
 
           <Button
-            className="w-full mt-4 bg-green-600"
-            onClick={() =>
-              router.push(`/counter/tables/${tableId}/bill/${orderId}`)
-            }
+            className="w-full mt-3 bg-green-600"
+            onClick={() => router.push(`/counter/bill/${orderId}`)}
           >
             View Bill
           </Button>
+
+          <Button
+            className="w-full mt-3 bg-yellow-600"
+            onClick={cancelOrder}
+          >
+            Cancel Order
+          </Button>
         </div>
       </div>
+
     </div>
   );
 }

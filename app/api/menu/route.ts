@@ -7,29 +7,19 @@ import MenuItem from '@/app/lib/models/MenuItem';
 let menuCache: any = null;
 let cacheTime = 0;
 
-export async function GET(req: Request) {
+export async function GET() {
   const now = Date.now();
 
-  /* CACHE 60 sec */
-
-  if (menuCache && now - cacheTime < 60000) {
+  /* ✅ 5 min cache (better) */
+  if (menuCache && now - cacheTime < 300000) {
     return NextResponse.json(menuCache);
   }
 
   await connectDB();
 
-  const { searchParams } = new URL(req.url);
-  const category = searchParams.get('category');
-
-  const query: any = {
-    status: 'active',
-  };
-
-  if (category) {
-    query.category = category;
-  }
-
-  const items = await MenuItem.find(query)
+  /* ✅ only active items */
+  const items = await MenuItem.find({ status: 'active' })
+    .select('name price category') // ⚡ reduce payload
     .sort({ category: 1, name: 1 })
     .lean();
 

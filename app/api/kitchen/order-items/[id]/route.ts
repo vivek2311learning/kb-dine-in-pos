@@ -18,48 +18,62 @@ export async function PATCH(
     const { status } = await req.json();
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json({ error: 'Invalid item id' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Invalid item id' },
+        { status: 400 }
+      );
     }
 
-    const item = await OrderItem.findById(id);
-
-    if (!item) {
-      return NextResponse.json({ error: 'Item not found' }, { status: 404 });
-    }
-
-    if (item.cancelled || item.wasted || item.served) {
-      return NextResponse.json({ error: 'Item not editable' }, { status: 400 });
-    }
-
-    const current = item.kitchenStatus;
-    const next = status;
-
-    const allowedTransitions: any = {
+    /* 🔥 ALLOWED TRANSITIONS */
+    const transitions: any = {
       pending: 'preparing',
       preparing: 'ready',
     };
 
-    if (allowedTransitions[current] !== next) {
+    const prev = Object.keys(transitions).find(
+      (key) => transitions[key] === status
+    );
+
+    if (!prev) {
       return NextResponse.json(
-        { error: `Invalid transition from ${current} to ${next}` },
-        { status: 400 },
+        { error: 'Invalid status' },
+        { status: 400 }
       );
     }
 
-    item.kitchenStatus = next;
-    await item.save();
+    /* 🔥 ATOMIC UPDATE */
+    const result = await OrderItem.updateOne(
+      {
+        _id: id,
+        kitchenStatus: prev,
+        cancelled: false,
+        wasted: false,
+        served: false,
+      },
+      {
+        kitchenStatus: status,
+      }
+    );
+
+    if (!result.modifiedCount) {
+      return NextResponse.json(
+        { error: 'Invalid transition or item locked' },
+        { status: 400 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
       itemId: id,
-      status: next,
+      status,
     });
+
   } catch (err) {
     console.error('Kitchen Status Error:', err);
 
     return NextResponse.json(
       { error: 'Failed to update status' },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

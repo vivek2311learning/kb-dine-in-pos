@@ -19,58 +19,71 @@ export async function POST(
     const { id } = await context.params;
     const { menuItemId } = await req.json();
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json({ error: 'Invalid order id' }, { status: 400 });
+    if (
+      !mongoose.Types.ObjectId.isValid(id) ||
+      !mongoose.Types.ObjectId.isValid(menuItemId)
+    ) {
+      return NextResponse.json({ error: 'Invalid ids' }, { status: 400 });
     }
 
-    if (!mongoose.Types.ObjectId.isValid(menuItemId)) {
-      return NextResponse.json(
-        { error: 'Invalid menu item id' },
-        { status: 400 },
-      );
-    }
+    /* 🔥 PARALLEL FETCH */
+    const [order, menuItem] = await Promise.all([
+      Order.findById(id)
+        .select('_id type tableId')
+        .lean(),
 
-    /* Fetch order */
-
-    const order = await Order.findById(id).lean();
+      Menu.findById(menuItemId)
+        .select('_id name price status')
+        .lean(),
+    ]);
 
     if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
-    /* Fetch menu item */
-
-    const menuItem = await Menu.findById(menuItemId).lean();
-
-    if (!menuItem) {
+    if (!menuItem || menuItem.status !== 'active') {
       return NextResponse.json(
-        { error: 'Menu item not found' },
-        { status: 404 },
-      );
-    }
-
-    if (menuItem.status !== 'active') {
-      return NextResponse.json(
-        { error: 'Menu item not available' },
+        { error: 'Menu not available' },
         { status: 400 },
       );
     }
 
-    /* Create order item */
+    /* 🔥 ATOMIC INCREMENT */
+    const updated = await OrderItem.findOneAndUpdate(
+      {
+        orderId: order._id,
+        menuItemId: menuItem._id,
+        kitchenStatus: 'draft',
+        cancelled: false,
+      },
+      {
+        $inc: { quantity: 1 },
+      },
+      {
+        new: true,
+      },
+    );
 
-    const item = await OrderItem.create({
-      orderId: id,
-      tableId: order.tableId || undefined,
+    if (updated) return NextResponse.json(updated);
+
+    /* CREATE NEW */
+    const newItem = await OrderItem.create({
+      orderId: order._id,
       menuItemId: menuItem._id,
       nameSnapshot: menuItem.name,
       priceSnapshot: menuItem.price,
       quantity: 1,
+      tableId: order.tableId || undefined,
     });
 
-    return NextResponse.json(item);
+    return NextResponse.json(newItem);
+
   } catch (err: any) {
     console.error('Add Item Error:', err);
 
-    return NextResponse.json({ error: 'Failed to add item' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to add item' },
+      { status: 500 },
+    );
   }
 }

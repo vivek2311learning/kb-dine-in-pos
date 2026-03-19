@@ -18,20 +18,20 @@ export async function PATCH(
 
     const { id } = await context.params;
 
-    /* -------- VALIDATE ID -------- */
-
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json({ error: 'Invalid order id' }, { status: 400 });
     }
 
-    const order = await Order.findById(id);
+    /* 🔥 MINIMAL FETCH */
+    const order = await Order.findById(id)
+      .select('tableId')
+      .lean();
 
     if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
-    /* -------- SERVED CHECK -------- */
-
+    /* 🔥 SERVED CHECK (FAST) */
     const servedExists = await OrderItem.exists({
       orderId: id,
       served: true,
@@ -40,69 +40,54 @@ export async function PATCH(
 
     if (servedExists) {
       return NextResponse.json(
-        { error: 'Cannot close order. Items already served.' },
+        { error: 'Cannot close. Items already served.' },
         { status: 400 },
       );
     }
 
-    /* -------- READY ITEMS → WASTE -------- */
-
+    /* 🔥 SINGLE BULK UPDATE */
     await OrderItem.updateMany(
-      {
-        orderId: id,
-        kitchenStatus: 'ready',
-        served: false,
-        cancelled: false,
-      },
-      {
-        $set: {
-          wasted: true,
-          billable: false,
+      { orderId: id, cancelled: false },
+      [
+        {
+          $set: {
+            cancelled: {
+              $cond: [{ $ne: ['$kitchenStatus', 'ready'] }, true, '$cancelled'],
+            },
+            wasted: {
+              $cond: [{ $eq: ['$kitchenStatus', 'ready'] }, true, '$wasted'],
+            },
+            billable: false,
+          },
         },
+      ],
+    );
+
+    /* 🔥 CLOSE ORDER */
+    await Order.updateOne(
+      { _id: id },
+      {
+        status: 'closed',
+        closedAt: new Date(),
+        closedReason: 'force_closed',
       },
     );
 
-    /* -------- OTHER ITEMS → CANCEL -------- */
+    /* 🔥 FREE TABLE */
+    if (order.tableId) {
+      await Table.updateOne(
+        { _id: order.tableId },
+        { status: 'free', currentOrderId: null },
+      );
+    }
 
-    await OrderItem.updateMany(
-      {
-        orderId: id,
-        kitchenStatus: { $ne: 'ready' },
-        cancelled: false,
-      },
-      {
-        $set: {
-          cancelled: true,
-          billable: false,
-        },
-      },
-    );
+    return NextResponse.json({ success: true });
 
-    /* -------- CLOSE ORDER -------- */
-
-    order.status = 'closed';
-    order.closedAt = new Date();
-    order.closedReason = 'abandoned';
-
-    await order.save();
-
-    /* -------- FREE TABLE -------- */
-
-    await Table.findByIdAndUpdate(order.tableId, {
-      status: 'free',
-      currentOrderId: null,
-    });
-
-    return NextResponse.json({
-      success: true,
-      orderId: id,
-      tableFreed: true,
-    });
   } catch (err) {
     console.error('Force Close Error:', err);
 
     return NextResponse.json(
-      { error: 'Failed to close order' },
+      { error: 'Failed to force close order' },
       { status: 500 },
     );
   }

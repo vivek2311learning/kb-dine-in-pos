@@ -5,14 +5,28 @@ import { connectDB } from '@/app/lib/db';
 import MenuItem from '@/app/lib/models/MenuItem';
 import { requireRole } from '@/app/lib/auth/requireRole';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     await requireRole(['admin']);
     await connectDB();
 
-    const items = await MenuItem.find().sort({ createdAt: -1 }).lean();
+    const { searchParams } = new URL(req.url);
+
+    const category = searchParams.get('category');
+    const status = searchParams.get('status');
+
+    const query: any = {};
+
+    if (category) query.category = category;
+    if (status) query.status = status;
+
+    const items = await MenuItem.find(query)
+      .select('name price category status')
+      .sort({ createdAt: -1 })
+      .lean(); // ⚡ fast
 
     return NextResponse.json(items);
+
   } catch (err) {
     console.error('Menu Fetch Error:', err);
 
@@ -38,9 +52,9 @@ export async function POST(req: Request) {
     }
 
     const item = await MenuItem.create({
-      name,
-      description,
-      price,
+      name: name.trim(),
+      description: description?.trim(),
+      price: Number(price),
       category,
       status: 'draft',
     });
@@ -49,6 +63,7 @@ export async function POST(req: Request) {
       success: true,
       item,
     });
+
   } catch (err) {
     console.error('Menu Create Error:', err);
 

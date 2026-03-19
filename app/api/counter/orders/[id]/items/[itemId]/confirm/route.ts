@@ -1,4 +1,4 @@
-export const dynamic = 'force-dynamic';
+
 
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/app/lib/db';
@@ -6,55 +6,48 @@ import OrderItem from '@/app/lib/models/orderItem';
 import mongoose from 'mongoose';
 import { requireRole } from '@/app/lib/auth/requireRole';
 
-export async function PATCH(
-  req: Request,
-  context: { params: Promise<{ itemId: string }> },
-) {
+export const dynamic = 'force-dynamic';
+
+export async function PATCH(req: Request, context: any) {
   try {
     await requireRole(['counter', 'admin']);
     await connectDB();
 
     const { itemId } = await context.params;
 
-    /* Validate ID */
-
     if (!mongoose.Types.ObjectId.isValid(itemId)) {
-      return NextResponse.json({ error: 'Invalid item id' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
     }
 
-    /* Find item */
+    /* 🔥 DIRECT ATOMIC UPDATE */
+    const updated = await OrderItem.updateOne(
+      {
+        _id: itemId,
+        kitchenStatus: 'draft',
+      },
+      {
+        kitchenStatus: 'pending',
+      },
+    );
 
-    const item = await OrderItem.findById(itemId);
-
-    if (!item) {
-      return NextResponse.json({ error: 'Item not found' }, { status: 404 });
-    }
-
-    /* Only draft items can be confirmed */
-
-    if (item.kitchenStatus !== 'draft') {
+    if (!updated.modifiedCount) {
       return NextResponse.json(
-        { error: 'Item already confirmed' },
+        { error: 'Already confirmed' },
         { status: 400 },
       );
     }
-
-    /* Update status */
-
-    item.kitchenStatus = 'pending';
-
-    await item.save();
 
     return NextResponse.json({
       success: true,
       itemId,
       status: 'pending',
     });
+
   } catch (err) {
-    console.error('Confirm Item Error:', err);
+    console.error(err);
 
     return NextResponse.json(
-      { error: 'Failed to confirm item' },
+      { error: 'Confirm failed' },
       { status: 500 },
     );
   }
