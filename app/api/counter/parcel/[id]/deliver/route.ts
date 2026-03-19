@@ -6,12 +6,13 @@ import Order from '@/app/lib/models/order'
 
 export async function PATCH(
 req:Request,
-context:{params:{id:string}}
-){
+context: { params: Promise<{ id: string }> }
+) {
+
 
 await connectDB()
 
-const {id}=context.params
+const {id}=await context.params
 
 await Order.findByIdAndUpdate(id,{
 parcelDelivered:true,

@@ -8,13 +8,13 @@ import { requireRole } from '@/app/lib/auth/requireRole';
 
 export async function PATCH(
   req: Request,
-  context: { params: { id: string } },
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     await requireRole(['admin']);
     await connectDB();
 
-    const { id } = context.params;
+    const { id } = await context.params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(

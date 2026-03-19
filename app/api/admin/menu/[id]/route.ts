@@ -7,13 +7,13 @@ import mongoose from 'mongoose';
 
 export async function PATCH(
   req: Request,
-  context: { params: { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     await requireRole(['admin']);
     await connectDB();
 
-    const { id } = context.params;
+    const { id } = await context.params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -24,44 +24,7 @@ export async function PATCH(
 
     const body = await req.json();
 
-    const update: any = {};
-
-    /* STATUS ACTION */
-    if (body.action) {
-      switch (body.action) {
-        case 'activate':
-          update.status = 'active';
-          update.archivedAt = null;
-          break;
-
-        case 'disable':
-          update.status = 'unavailable';
-          break;
-
-        case 'archive':
-          update.status = 'archived';
-          update.archivedAt = new Date();
-          break;
-
-        default:
-          return NextResponse.json(
-            { error: 'Invalid action' },
-            { status: 400 },
-          );
-      }
-    }
-
-    /* NORMAL UPDATE */
-    if (body.name) update.name = body.name.trim();
-    if (body.description) update.description = body.description.trim();
-    if (body.price) update.price = Number(body.price);
-    if (body.category) update.category = body.category;
-
-    const item = await MenuItem.findByIdAndUpdate(
-      id,
-      update,
-      { new: true }
-    ).lean();
+    const item = await MenuItem.findById(id);
 
     if (!item) {
       return NextResponse.json(
@@ -70,11 +33,49 @@ export async function PATCH(
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      item,
+    /* STATUS ACTIONS */
+
+    if (body.action) {
+      switch (body.action) {
+        case 'activate':
+          item.status = 'active';
+          item.archivedAt = undefined;
+          break;
+
+        case 'disable':
+          item.status = 'unavailable';
+          break;
+
+        case 'archive':
+          item.status = 'archived';
+          item.archivedAt = new Date();
+          break;
+
+        default:
+          return NextResponse.json(
+            { error: 'Invalid action' },
+            { status: 400 },
+          );
+      }
+
+      await item.save();
+
+      return NextResponse.json({
+        success: true,
+        item,
+      });
+    }
+
+    /* NORMAL UPDATE */
+
+    const updated = await MenuItem.findByIdAndUpdate(id, body, {
+      new: true,
     });
 
+    return NextResponse.json({
+      success: true,
+      item: updated,
+    });
   } catch (err) {
     console.error('Menu Update Error:', err);
 
@@ -87,13 +88,13 @@ export async function PATCH(
 
 export async function DELETE(
   req: Request,
-  context: { params: { id: string } },
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     await requireRole(['admin']);
     await connectDB();
 
-    const { id } = context.params;
+    const { id } = await context.params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
