@@ -1,11 +1,9 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
+import { connectDB } from '@/app/lib/db';
 import mongoose from 'mongoose';
 
-import { connectDB } from '@/app/lib/db';
-
-import Bill from '@/app/lib/models/bill';
 import Order from '@/app/lib/models/order';
 import Table from '@/app/lib/models/Table';
 
@@ -18,23 +16,45 @@ export async function GET(req: Request) {
     const page = Number(searchParams.get('page') || 1);
     const limit = Number(searchParams.get('limit') || 10);
 
-    const billNumber = searchParams.get('billNumber');
+    const type = searchParams.get('type'); // dine-in | parcel
+    const status = searchParams.get('status'); // running | closed
+    const orderType = searchParams.get('orderType'); // completed | cancelled | force_closed
+
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
     const skip = (page - 1) * limit;
 
-    /* 🔥 FILTER */
-    const query: any = { isPaid: true };
+    const query: Record<string, any> = {};
 
-    if (billNumber) {
-      query.billNumber = Number(billNumber);
+    /* ORDER STATE FILTER */
+    if (orderType === 'completed') {
+      query.status = 'closed';
+      query.closedReason = 'completed';
+    } else if (orderType === 'cancelled') {
+      query.status = 'closed';
+      query.closedReason = 'cancelled';
+    } else if (orderType === 'force_closed') {
+      query.status = 'closed';
+      query.closedReason = 'force_closed';
+    } else if (status) {
+      query.status = status;
+    } else {
+      query.status = 'running';
     }
 
+    /* ORDER MODE FILTER */
+    if (type === 'dine-in' || type === 'parcel') {
+      query.type = type;
+    }
+
+    /* DATE FILTER */
     if (startDate || endDate) {
       query.createdAt = {};
 
-      if (startDate) query.createdAt.$gte = new Date(startDate);
+      if (startDate) {
+        query.createdAt.$gte = new Date(startDate);
+      }
 
       if (endDate) {
         const end = new Date(endDate);
@@ -43,99 +63,66 @@ export async function GET(req: Request) {
       }
     }
 
-    /* 🔥 BILLS */
-    const [bills, total] = await Promise.all([
-      Bill.find(query)
+    const [orders, total] = await Promise.all([
+      Order.find(query)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .select('orderId billNumber totalAmount isPaid createdAt')
+        .select(
+          '_id tableId parcelNumber type status createdAt closedAt closedReason',
+        )
         .lean(),
 
-      Bill.countDocuments(query),
+      Order.countDocuments(query),
     ]);
 
-    /* 🔥 ORDERS */
-    const orderIds = bills.map((b) => b.orderId);
-
-    const orders = await Order.find({
-      _id: { $in: orderIds },
-    })
-      .select('tableId parcelNumber type openedAt closedAt')
-      .lean();
-
-    /* 🔥 TABLE IDS CLEAN */
     const tableIds = orders
-  .map((o) => {
-    if (!o.tableId) return null;
+      .map((order: any) => {
+        if (!order.tableId) return null;
+        return String(order.tableId);
+      })
+      .filter((id): id is string => Boolean(id))
+      .filter((id) => mongoose.Types.ObjectId.isValid(id))
+      .map((id) => new mongoose.Types.ObjectId(id));
 
-    // अगर populated object है
-    if (typeof o.tableId === 'object') {
-      return o.tableId._id;
-    }
+    const tables =
+      tableIds.length > 0
+        ? await Table.find({ _id: { $in: tableIds } })
+            .select('_id tableNumber')
+            .lean()
+        : [];
 
-    return o.tableId;
-  })
-  .filter(
-    (id) =>
-      id &&
-      mongoose.Types.ObjectId.isValid(id.toString())
-  );
-
-    const tables = await Table.find({
-      _id: { $in: tableIds },
-    })
-      .select('tableNumber')
-      .lean();
-
-    /* 🔥 MAP (FAST) */
-    const orderMap = new Map();
-    orders.forEach(o => orderMap.set(o._id.toString(), o));
-
-    const tableMap = new Map();
-    tables.forEach(t => tableMap.set(t._id.toString(), t));
-
-    const result = bills.map((bill) => {
-      const order: any = orderMap.get(bill.orderId.toString());
-
-      let tableNumber = null;
-      let parcelNumber = null;
-
-      if (order?.type === 'dine-in' && order.tableId) {
-        const table = tableMap.get(order.tableId.toString());
-        tableNumber = table?.tableNumber || null;
-      }
-
-      if (order?.type === 'parcel') {
-        parcelNumber = order?.parcelNumber || null;
-      }
-
-      return {
-        _id: order?._id,
-        billNumber: bill.billNumber,
-        totalAmount: bill.totalAmount,
-        isPaid: bill.isPaid,
-        orderType: order?.type,
-        tableNumber,
-        parcelNumber,
-        openedAt: order?.openedAt,
-        closedAt: order?.closedAt,
-      };
+    const tableMap = new Map<string, number>();
+    tables.forEach((table: any) => {
+      tableMap.set(String(table._id), table.tableNumber);
     });
 
+    const data = orders.map((order: any) => ({
+      _id: order._id,
+      orderType: order.type,
+      status: order.status,
+      closedReason: order.closedReason || null,
+      tableNumber:
+        order.type === 'dine-in' && order.tableId
+          ? tableMap.get(String(order.tableId)) || null
+          : null,
+      parcelNumber: order.type === 'parcel' ? order.parcelNumber || null : null,
+      openedAt: order.createdAt,
+      closedAt: order.closedAt || null,
+    }));
+
     return NextResponse.json({
-      data: result,
+      data,
       total,
       page,
       limit,
       totalPages: Math.ceil(total / limit),
     });
-
   } catch (err: any) {
     console.error('Admin Orders Error:', err);
 
     return NextResponse.json(
-      { error: err.message },
+      { error: err.message || 'Failed to load orders' },
       { status: 500 },
     );
   }

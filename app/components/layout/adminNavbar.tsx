@@ -8,9 +8,9 @@ import { useEffect, useState } from 'react';
 
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/admin/dashboard' },
-  { label: 'Menu', href: '/admin/menu' },
-  { label: 'Staff', href: '/admin/staff' },
-  { label: 'Reports', href: '/admin/reports' },
+  { label: 'Menu Management', href: '/admin/menu' },
+  { label: 'Staff Management', href: '/admin/staff' },
+  // { label: 'Reports', href: '/admin/reports' },
 ];
 
 export function AdminNavbar() {

@@ -21,10 +21,10 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid order id' }, { status: 400 });
     }
 
-    /* 🔥 PARALLEL FETCH */
     const [order, items] = await Promise.all([
       Order.findById(id)
         .select('_id type status tableId parcelNumber')
+        .populate('tableId', 'tableNumber')
         .lean(),
 
       OrderItem.find({
@@ -41,7 +41,6 @@ export async function GET(
     }
 
     return NextResponse.json({ order, items });
-
   } catch (err: any) {
     console.error('Order Fetch Error:', err);
 

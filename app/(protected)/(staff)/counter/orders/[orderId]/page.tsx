@@ -152,15 +152,66 @@ export default function OrderPage() {
   const hasServedItems = items.some((i) => i.served === true);
 
   const cancelOrder = async () => {
-    if (!confirm('Cancel order?')) return;
+    if (loading) return;
 
-    await fetch(`/api/counter/orders/${orderId}/cancel`, {
-      method: 'PATCH',
-    });
-
-    router.push(
-      order?.type === 'parcel' ? '/counter/parcel' : '/counter/tables',
+    const confirmed = window.confirm(
+      'Cancel this order? If kitchen progress exists, it will be force closed.',
     );
+
+    if (!confirmed) return;
+
+    setLoading(true);
+
+    try {
+      const resOrder = await fetch(`/api/counter/orders/${orderId}`, {
+        cache: 'no-store',
+        credentials: 'include',
+      });
+
+      const latest = await resOrder.json();
+
+      if (!resOrder.ok) {
+        alert(latest.error || 'Failed to load latest order');
+        return;
+      }
+
+      const latestItems = latest.items || [];
+
+      const hasKitchenProgress = latestItems.some(
+        (item: any) =>
+          !item.cancelled &&
+          !item.wasted &&
+          (item.served === true ||
+            ['confirmed', 'pending', 'preparing', 'ready'].includes(
+              item.kitchenStatus,
+            )),
+      );
+
+      const url = hasKitchenProgress
+        ? `/api/counter/orders/${orderId}/force-close`
+        : `/api/counter/orders/${orderId}/cancel`;
+
+      const res = await fetch(url, {
+        method: 'PATCH',
+        credentials: 'include',
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || 'Action failed');
+        return;
+      }
+
+      router.push(
+        latest.order?.type === 'parcel' ? '/counter/parcel' : '/counter/tables',
+      );
+    } catch (err) {
+      console.error(err);
+      alert('Something went wrong');
+    } finally {
+      setLoading(false);
+    }
   };
 
   /* ================= FILTER ================= */
@@ -192,8 +243,8 @@ export default function OrderPage() {
 
   const label =
     order?.type === 'parcel'
-      ? `Parcel #${order.parcelNumber}`
-      : `Table ${order?.tableId?.tableNumber || ''}`;
+      ? `Parcel #${order?.parcelNumber ?? '-'}`
+      : `Table ${order?.tableId?.tableNumber ?? '-'}`;
 
   /* ================= UI ================= */
 
@@ -251,7 +302,7 @@ export default function OrderPage() {
                     <Button onClick={() => updateQty(i._id, i.quantity - 1)}>
                       -
                     </Button>
-                    <span className='p-2'>{i.quantity}</span>
+                    <span className="p-2">{i.quantity}</span>
                     <Button onClick={() => updateQty(i._id, i.quantity + 1)}>
                       +
                     </Button>

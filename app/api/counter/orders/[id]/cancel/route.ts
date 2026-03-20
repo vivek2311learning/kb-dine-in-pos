@@ -8,8 +8,6 @@ import Table from '@/app/lib/models/Table';
 import mongoose from 'mongoose';
 import { requireRole } from '@/app/lib/auth/requireRole';
 
-
-
 export async function PATCH(
   req: Request,
   context: { params: Promise<{ id: string }> },
@@ -17,16 +15,16 @@ export async function PATCH(
   const session = await mongoose.startSession();
 
   try {
-    await requireRole(['counter','admin']);
+    await requireRole(['counter', 'admin']);
     await connectDB();
-
-    session.startTransaction();
 
     const { id } = await context.params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new Error('Invalid order id');
+      return NextResponse.json({ error: 'Invalid order id' }, { status: 400 });
     }
+
+    session.startTransaction();
 
     const order = await Order.findById(id).session(session);
 
@@ -34,41 +32,53 @@ export async function PATCH(
       throw new Error('Order not found');
     }
 
-    /* ❌ SERVED CHECK */
-    const servedExists = await OrderItem.exists({
-      orderId: id,
-      served: true,
-      cancelled: false,
-    });
-
-    if (servedExists) {
-      throw new Error('Cannot cancel. Items already served.');
+    if (order.status === 'closed') {
+      throw new Error('Order already closed');
     }
 
-    /* 🔥 CANCEL ITEMS */
+    /* ❌ block if any item has entered kitchen process or is already served */
+    const blocked = await OrderItem.exists({
+      orderId: id,
+      cancelled: false,
+      $or: [
+        { served: true },
+        { kitchenStatus: { $in: ['pending', 'preparing', 'ready'] } },
+      ],
+    });
+
+    if (blocked) {
+      throw new Error(
+        'Cannot cancel. Some items are already in kitchen process.',
+      );
+    }
+
     await OrderItem.updateMany(
       { orderId: id, cancelled: false },
-      { cancelled: true, billable: false },
-      { session }
+      {
+        cancelled: true,
+        billable: false,
+        wasted: false,
+      },
+      { session },
     );
 
-    /* 🔥 CLOSE ORDER */
     order.status = 'closed';
+    order.closedReason = 'cancelled';
     order.closedAt = new Date();
+
     await order.save({ session });
 
-    /* 🔥 FORCE FREE TABLE (SAFE WAY) */
     if (order.tableId) {
       await Table.updateOne(
         {
           _id: order.tableId,
-          currentOrderId: order._id, // ✅ ensure सही order
+          currentOrderId: order._id,
         },
         {
           status: 'free',
           currentOrderId: null,
         },
-        { session }
+        { session },
       );
     }
 
@@ -77,15 +87,18 @@ export async function PATCH(
     return NextResponse.json({
       success: true,
       orderId: id,
-      tableFreed: true,
+      type: 'cancelled',
     });
-
   } catch (err: any) {
     await session.abortTransaction();
 
+    console.error('Cancel Order Error:', err);
+
     return NextResponse.json(
-      { error: err.message },
-      { status: 400 }
+      { error: err.message || 'Cancel failed' },
+      { status: 400 },
     );
+  } finally {
+    await session.endSession();
   }
 }

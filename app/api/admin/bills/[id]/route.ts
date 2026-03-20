@@ -18,55 +18,55 @@ export async function GET(
 
     const { id } = await context.params;
 
-    /* ✅ VALIDATION */
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json(
-        { error: 'Invalid bill id' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Invalid bill id' }, { status: 400 });
     }
 
-    /* ⚡ LIGHT BILL FETCH */
     const bill = await Bill.findById(id)
       .select(
-        'billNumber totalAmount subtotal tax discount isPaid paidAt isRefunded refundAt refundReason orderId printedAt'
+        'orderId billNumber totalAmount subtotal tax discount isPaid paidAt isRefunded refundAt refundReason printedAt createdAt',
       )
       .lean();
 
     if (!bill) {
-      return NextResponse.json(
-        { error: 'Bill not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Bill not found' }, { status: 404 });
     }
 
-    /* ⚡ PARALLEL FETCH */
     const [items, payments] = await Promise.all([
       OrderItem.find({
         orderId: bill.orderId,
         cancelled: false,
+        wasted: false,
       })
         .select('nameSnapshot priceSnapshot quantity served')
         .lean(),
 
-      Payment.find({ billId: id })
-        .select('method amount')
-        .lean(),
+      Payment.find({ billId: id }).select('method amount').lean(),
     ]);
 
-    /* ✅ RESPONSE */
     return NextResponse.json({
-      ...bill,
+      _id: bill._id,
+      orderId: bill.orderId,
+      billNumber: bill.billNumber,
+      subtotal: bill.subtotal || 0,
+      tax: bill.tax || 0,
+      discount: bill.discount || 0,
+      totalAmount: bill.totalAmount || 0,
+      isPaid: !!bill.isPaid,
+      paidAt: bill.paidAt || null,
+      isRefunded: !!bill.isRefunded,
+      refundAt: bill.refundAt || null,
+      refundReason: bill.refundReason || null,
+      printedAt: bill.printedAt || bill.createdAt || null,
       items,
       payments,
     });
-
   } catch (err: any) {
     console.error('Bill Detail Error:', err);
 
     return NextResponse.json(
-      { error: err.message },
-      { status: 500 }
+      { error: err.message || 'Failed to load bill detail' },
+      { status: 500 },
     );
   }
 }

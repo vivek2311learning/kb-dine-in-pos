@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card } from '@/app/components/ui/card';
 
 interface Bill {
@@ -15,6 +15,10 @@ interface Bill {
 
 export default function AdminBillsPage() {
   const router = useRouter();
+  const params = useSearchParams();
+
+  const pending = params.get('pending');
+  const today = params.get('today');
 
   const [bills, setBills] = useState<Bill[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,7 +36,6 @@ export default function AdminBillsPage() {
 
   const [debounced, setDebounced] = useState(search);
 
-  /* 🔥 DEBOUNCE */
   useEffect(() => {
     const t = setTimeout(() => {
       setDebounced(search);
@@ -42,7 +45,6 @@ export default function AdminBillsPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  /* 🔥 FETCH */
   useEffect(() => {
     const fetchBills = async () => {
       try {
@@ -53,14 +55,20 @@ export default function AdminBillsPage() {
           limit: String(limit),
         });
 
-        if (debounced.billNumber)
+        if (pending === 'true') query.append('pending', 'true');
+        if (today === 'true') query.append('today', 'true');
+
+        if (debounced.billNumber) {
           query.append('billNumber', debounced.billNumber);
+        }
 
-        if (debounced.startDate)
+        if (debounced.startDate) {
           query.append('startDate', debounced.startDate);
+        }
 
-        if (debounced.endDate)
+        if (debounced.endDate) {
           query.append('endDate', debounced.endDate);
+        }
 
         const res = await fetch(`/api/admin/bills?${query}`, {
           cache: 'no-store',
@@ -70,7 +78,6 @@ export default function AdminBillsPage() {
 
         setBills(data.data || []);
         setTotal(data.total || 0);
-
       } catch (err) {
         console.error(err);
       } finally {
@@ -79,83 +86,94 @@ export default function AdminBillsPage() {
     };
 
     fetchBills();
-  }, [page, debounced]);
+  }, [page, debounced, pending, today]);
 
   const totalPages = Math.ceil(total / limit);
 
   const statusBadge = (bill: Bill) => {
-    if (bill.isRefunded)
-      return <span className="text-xs px-2 py-1 bg-red-100 text-red-600 rounded">Refunded</span>;
+    if (bill.isRefunded) {
+      return (
+        <span className="text-xs px-2 py-1 bg-red-100 text-red-600 rounded">
+          Refunded
+        </span>
+      );
+    }
 
-    if (bill.isPaid)
-      return <span className="text-xs px-2 py-1 bg-green-100 text-green-600 rounded">Paid</span>;
+    if (bill.isPaid) {
+      return (
+        <span className="text-xs px-2 py-1 bg-green-100 text-green-600 rounded">
+          Paid
+        </span>
+      );
+    }
 
-    return <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-600 rounded">Unpaid</span>;
+    return (
+      <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-600 rounded">
+        Unpaid
+      </span>
+    );
   };
+
+  const title =
+    pending === 'true'
+      ? 'Pending Bills'
+      : today === 'true'
+        ? "Today's Bills"
+        : 'Bills';
 
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6">
+      <h1 className="text-3xl font-bold">{title}</h1>
 
-      <h1 className="text-3xl font-bold">Bills</h1>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div>
+          <label htmlFor="billNumber" className="sr-only">
+            Bill Number
+          </label>
 
-      {/* 🔍 SEARCH */}
+          <input
+            id="billNumber"
+            placeholder="Bill No"
+            value={search.billNumber}
+            onChange={(e) =>
+              setSearch((s) => ({ ...s, billNumber: e.target.value }))
+            }
+            className="border p-2 rounded w-full"
+          />
+        </div>
 
-           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div>
+          <label htmlFor="startDate" className="sr-only">
+            Start Date
+          </label>
 
-  {/* BILL NUMBER */}
-  <div>
-    <label htmlFor="billNumber" className="sr-only">
-      Bill Number
-    </label>
+          <input
+            id="startDate"
+            type="date"
+            value={search.startDate}
+            onChange={(e) =>
+              setSearch((s) => ({ ...s, startDate: e.target.value }))
+            }
+            className="border p-2 rounded w-full"
+          />
+        </div>
 
-    <input
-      id="billNumber"
-      placeholder="Bill No"
-      value={search.billNumber}
-      onChange={(e) =>
-        setSearch((s) => ({ ...s, billNumber: e.target.value }))
-      }
-      className="border p-2 rounded w-full"
-    />
-  </div>
+        <div>
+          <label htmlFor="endDate" className="sr-only">
+            End Date
+          </label>
 
-  {/* START DATE */}
-  <div>
-    <label htmlFor="startDate" className="sr-only">
-      Start Date
-    </label>
-
-    <input
-      id="startDate"
-      type="date"
-      value={search.startDate}
-      onChange={(e) =>
-        setSearch((s) => ({ ...s, startDate: e.target.value }))
-      }
-      className="border p-2 rounded w-full"
-    />
-  </div>
-
-  {/* END DATE */}
-  <div>
-    <label htmlFor="endDate" className="sr-only">
-      End Date
-    </label>
-
-    <input
-      id="endDate"
-      type="date"
-      value={search.endDate}
-      onChange={(e) =>
-        setSearch((s) => ({ ...s, endDate: e.target.value }))
-      }
-      className="border p-2 rounded w-full"
-    />
-  </div>
-
-</div>
-
-      {/* LIST */}
+          <input
+            id="endDate"
+            type="date"
+            value={search.endDate}
+            onChange={(e) =>
+              setSearch((s) => ({ ...s, endDate: e.target.value }))
+            }
+            className="border p-2 rounded w-full"
+          />
+        </div>
+      </div>
 
       {loading && <p className="text-gray-500">Loading...</p>}
 
@@ -164,7 +182,6 @@ export default function AdminBillsPage() {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-
         {bills.map((bill) => (
           <Card
             key={bill._id}
@@ -172,7 +189,6 @@ export default function AdminBillsPage() {
             className="p-4 cursor-pointer hover:shadow-lg transition"
           >
             <div className="flex justify-between">
-
               <div>
                 <p className="font-semibold">Bill #{bill.billNumber}</p>
 
@@ -186,23 +202,16 @@ export default function AdminBillsPage() {
               {statusBadge(bill)}
             </div>
 
-            <div className="mt-3 text-lg font-bold">
-              ₹{bill.totalAmount}
-            </div>
-
+            <div className="mt-3 text-lg font-bold">₹{bill.totalAmount}</div>
           </Card>
         ))}
-
       </div>
-
-      {/* 🔥 PAGINATION */}
 
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-4">
-
           <button
             disabled={page === 1}
-            onClick={() => setPage(p => p - 1)}
+            onClick={() => setPage((p) => p - 1)}
             className="px-3 py-1 border rounded disabled:opacity-40"
           >
             Prev
@@ -214,15 +223,13 @@ export default function AdminBillsPage() {
 
           <button
             disabled={page === totalPages}
-            onClick={() => setPage(p => p + 1)}
+            onClick={() => setPage((p) => p + 1)}
             className="px-3 py-1 border rounded disabled:opacity-40"
           >
             Next
           </button>
-
         </div>
       )}
-
     </div>
   );
 }

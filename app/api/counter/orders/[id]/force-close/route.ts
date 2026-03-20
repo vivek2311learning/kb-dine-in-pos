@@ -12,6 +12,8 @@ export async function PATCH(
   req: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  const session = await mongoose.startSession();
+
   try {
     await requireRole(['counter', 'admin']);
     await connectDB();
@@ -22,73 +24,103 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid order id' }, { status: 400 });
     }
 
-    /* 🔥 MINIMAL FETCH */
-    const order = await Order.findById(id)
-      .select('tableId')
-      .lean();
+    session.startTransaction();
+
+    const order = await Order.findById(id).session(session);
 
     if (!order) {
-      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+      throw new Error('Order not found');
     }
 
-    /* 🔥 SERVED CHECK (FAST) */
-    const servedExists = await OrderItem.exists({
+    if (order.status === 'closed') {
+      throw new Error('Order already closed');
+    }
+
+    /* ready items = waste */
+    const readyItemsExist = await OrderItem.exists({
       orderId: id,
-      served: true,
       cancelled: false,
+      wasted: false,
+      kitchenStatus: 'ready',
     });
 
-    if (servedExists) {
-      return NextResponse.json(
-        { error: 'Cannot close. Items already served.' },
-        { status: 400 },
-      );
-    }
-
-    /* 🔥 SINGLE BULK UPDATE */
+    /* non-ready active items = cancelled */
     await OrderItem.updateMany(
-      { orderId: id, cancelled: false },
-      [
-        {
-          $set: {
-            cancelled: {
-              $cond: [{ $ne: ['$kitchenStatus', 'ready'] }, true, '$cancelled'],
-            },
-            wasted: {
-              $cond: [{ $eq: ['$kitchenStatus', 'ready'] }, true, '$wasted'],
-            },
-            billable: false,
-          },
-        },
-      ],
-    );
-
-    /* 🔥 CLOSE ORDER */
-    await Order.updateOne(
-      { _id: id },
       {
-        status: 'closed',
-        closedAt: new Date(),
-        closedReason: 'force_closed',
+        orderId: id,
+        cancelled: false,
+        served: false,
+        kitchenStatus: { $ne: 'ready' },
       },
+      {
+        $set: {
+          cancelled: true,
+          billable: false,
+          wasted: false,
+          cancelledAt: new Date(),
+          cancelStage: 'force_close',
+        },
+      },
+      { session },
     );
 
-    /* 🔥 FREE TABLE */
+    /* ready items = wasted */
+    await OrderItem.updateMany(
+      {
+        orderId: id,
+        cancelled: false,
+        served: false,
+        wasted: false,
+        kitchenStatus: 'ready',
+      },
+      {
+        $set: {
+          wasted: true,
+          billable: false,
+        },
+      },
+      { session },
+    );
+
+    order.status = 'closed';
+    order.closedReason = 'force_closed';
+    order.closedAt = new Date();
+
+    await order.save({ session });
+
     if (order.tableId) {
       await Table.updateOne(
-        { _id: order.tableId },
-        { status: 'free', currentOrderId: null },
+        {
+          _id: order.tableId,
+          currentOrderId: order._id,
+        },
+        {
+          $set: {
+            status: 'free',
+            currentOrderId: null,
+          },
+        },
+        { session },
       );
     }
 
-    return NextResponse.json({ success: true });
+    await session.commitTransaction();
 
-  } catch (err) {
+    return NextResponse.json({
+      success: true,
+      type: 'force_closed',
+      hasWaste: !!readyItemsExist,
+    });
+  } catch (err: any) {
+    await session.abortTransaction();
+
     console.error('Force Close Error:', err);
 
     return NextResponse.json(
-      { error: 'Failed to force close order' },
-      { status: 500 },
+      { error: err.message || 'Failed to force close order' },
+      { status: 400 },
     );
+  } finally {
+    await session.endSession();
   }
 }

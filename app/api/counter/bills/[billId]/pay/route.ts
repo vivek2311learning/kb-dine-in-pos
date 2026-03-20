@@ -28,13 +28,21 @@ export async function PATCH(
     const { billId } = await params;
     const { payments } = await req.json();
 
+    if (!mongoose.Types.ObjectId.isValid(billId)) {
+      throw new Error('Invalid bill id');
+    }
+
+    if (!Array.isArray(payments) || payments.length === 0) {
+      throw new Error('Payments are required');
+    }
+
     const bill = await Bill.findById(billId).session(session);
     if (!bill) throw new Error('Bill not found');
 
     if (bill.isPaid) throw new Error('Already paid');
 
     const totalPaid = payments.reduce(
-      (sum: number, p: any) => sum + Number(p.amount),
+      (sum: number, p: any) => sum + Number(p.amount || 0),
       0,
     );
 
@@ -47,31 +55,32 @@ export async function PATCH(
 
     const payload: any = await verifyToken(token);
 
-    /* 🔥 SAVE PAYMENTS */
     await Payment.insertMany(
       payments.map((p: any) => ({
         billId: bill._id,
         method: p.method,
-        amount: p.amount,
+        amount: Number(p.amount),
         receivedBy: payload.userId,
       })),
-      { session }
+      { session },
     );
 
-    /* 🔥 UPDATE BILL */
     bill.isPaid = true;
     bill.paidAt = new Date();
     await bill.save({ session });
 
-    /* 🔥 UPDATE ORDER */
     const order = await Order.findById(bill.orderId).session(session);
     if (!order) throw new Error('Order not found');
 
-    order.status = 'paid';
+    if (order.status === 'closed') {
+      throw new Error('Order already closed');
+    }
+
+    order.status = 'closed';
+    order.closedReason = 'completed';
     order.closedAt = new Date();
     await order.save({ session });
 
-    /* 🔥 FREE TABLE */
     if (order.tableId) {
       await Table.findByIdAndUpdate(
         order.tableId,
@@ -79,7 +88,7 @@ export async function PATCH(
           status: 'free',
           currentOrderId: null,
         },
-        { session }
+        { session },
       );
     }
 
@@ -88,17 +97,18 @@ export async function PATCH(
     return NextResponse.json({
       success: true,
       orderId: order._id,
+      status: 'closed',
+      closedReason: 'completed',
     });
-
   } catch (err: any) {
     await session.abortTransaction();
     console.error('Payment Error:', err);
 
     return NextResponse.json(
-      { error: err.message },
+      { error: err.message || 'Payment failed' },
       { status: 500 },
     );
   } finally {
-    session.endSession();
+    await session.endSession();
   }
 }

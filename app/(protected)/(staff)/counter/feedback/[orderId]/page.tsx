@@ -22,25 +22,42 @@ export default function FeedbackPage() {
   const handleSubmit = async () => {
     if (!orderId) return;
 
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    const res = await fetch('/api/counter/feedback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        orderId,
-        rating,
-        comment,
-      }),
-    });
+      const res = await fetch('/api/counter/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          orderId,
+          rating,
+          comment,
+        }),
+      });
 
-    if (!res.ok) {
-      console.error(await res.json());
+      const text = await res.text();
+
+      let data: any = null;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        data = { error: text || 'Invalid server response' };
+      }
+
+      if (!res.ok) {
+        console.error('Feedback submit failed:', data);
+        alert(data?.error || 'Feedback submit failed');
+        return;
+      }
+
+      router.push('/counter/tables');
+    } catch (err) {
+      console.error('Feedback submit error:', err);
+      alert('Something went wrong');
+    } finally {
       setLoading(false);
-      return;
     }
-
-    router.push('/counter/tables');
   };
 
   /* ---------------- SKIP ---------------- */

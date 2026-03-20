@@ -7,43 +7,74 @@ import Table from '@/app/lib/models/Table';
 import mongoose from 'mongoose';
 import { requireRole } from '@/app/lib/auth/requireRole';
 
-export async function PATCH(req: Request, context: any) {
+export async function PATCH(
+  req: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  const session = await mongoose.startSession();
+
   try {
     await requireRole(['counter', 'admin']);
     await connectDB();
 
     const { id } = await context.params;
 
-    const order = await Order.findById(id)
-      .select('status tableId')
-      .lean();
-
-    if (!order || order.status !== 'paid') {
-      return NextResponse.json(
-        { error: 'Invalid order state' },
-        { status: 400 },
-      );
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json({ error: 'Invalid order id' }, { status: 400 });
     }
 
-    await Order.updateOne(
-      { _id: id },
-      {
-        status: 'closed',
-        closedAt: new Date(),
-        closedReason: 'completed',
-      },
-    );
+    session.startTransaction();
+
+    const order = await Order.findById(id).session(session);
+
+    if (!order) {
+      throw new Error('Order not found');
+    }
+
+    if (order.status === 'closed') {
+      throw new Error('Order already closed');
+    }
+
+    if (order.status !== 'paid') {
+      throw new Error('Order must be paid before closing');
+    }
+
+    order.status = 'closed';
+    order.closedReason = 'completed';
+    order.closedAt = new Date();
+
+    await order.save({ session });
 
     if (order.tableId) {
       await Table.updateOne(
-        { _id: order.tableId },
-        { status: 'free', currentOrderId: null },
+        {
+          _id: order.tableId,
+          currentOrderId: order._id,
+        },
+        {
+          status: 'free',
+          currentOrderId: null,
+        },
+        { session },
       );
     }
 
-    return NextResponse.json({ success: true });
+    await session.commitTransaction();
 
-  } catch (err) {
-    return NextResponse.json({ error: 'Failed' }, { status: 500 });
+    return NextResponse.json({
+      success: true,
+      type: 'completed',
+    });
+  } catch (err: any) {
+    await session.abortTransaction();
+
+    console.error('Complete Order Error:', err);
+
+    return NextResponse.json(
+      { error: err.message || 'Failed to close order' },
+      { status: 400 },
+    );
+  } finally {
+    await session.endSession();
   }
 }

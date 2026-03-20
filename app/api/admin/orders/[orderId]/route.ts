@@ -22,41 +22,32 @@ export async function GET(
 
     const { orderId } = await context.params;
 
-    /* ✅ VALIDATION */
     if (!mongoose.Types.ObjectId.isValid(orderId)) {
-      return NextResponse.json(
-        { error: 'Invalid order id' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Invalid order id' }, { status: 400 });
     }
 
-    /* ⚡ ORDER (LEAN + LIGHT) */
     const order = await Order.findById(orderId)
-      .select('status tableId parcelNumber type createdAt closedAt updatedAt')
+      .select(
+        '_id status closedReason tableId parcelNumber type createdAt closedAt updatedAt',
+      )
       .lean();
 
     if (!order) {
-      return NextResponse.json(
-        { error: 'Order not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
-    /* ⚡ PARALLEL FETCH */
     const [items, bill] = await Promise.all([
-      OrderItem.find({
-        orderId,
-        cancelled: false,
-      })
-        .select('nameSnapshot priceSnapshot quantity served')
+      OrderItem.find({ orderId })
+        .select(
+          '_id nameSnapshot priceSnapshot quantity kitchenStatus served cancelled wasted',
+        )
         .lean(),
 
       Bill.findOne({ orderId })
-        .select('billNumber totalAmount isPaid _id')
+        .select('_id billNumber totalAmount isPaid')
         .lean(),
     ]);
 
-    /* ⚡ TABLE FETCH (ONLY IF NEEDED) */
     let tableNumber: number | null = null;
 
     if (order.type === 'dine-in' && order.tableId) {
@@ -67,8 +58,7 @@ export async function GET(
       tableNumber = table?.tableNumber || null;
     }
 
-    /* ⚡ PAYMENTS */
-    let payments: any[] = [];
+    let payments: Array<{ method: string; amount: number }> = [];
 
     if (bill?._id) {
       payments = await Payment.find({ billId: bill._id })
@@ -76,31 +66,56 @@ export async function GET(
         .lean();
     }
 
-    /* 🔥 FINAL CLEAN RESPONSE */
+    const total = items.reduce(
+      (sum, item: any) => sum + item.priceSnapshot * item.quantity,
+      0,
+    );
+
+    const servedTotal = items
+      .filter((item: any) => item.served === true)
+      .reduce((sum, item: any) => sum + item.priceSnapshot * item.quantity, 0);
+
+    const cancelledTotal = items
+      .filter((item: any) => item.cancelled === true && item.wasted !== true)
+      .reduce((sum, item: any) => sum + item.priceSnapshot * item.quantity, 0);
+
+    const wastedTotal = items
+      .filter((item: any) => item.wasted === true)
+      .reduce((sum, item: any) => sum + item.priceSnapshot * item.quantity, 0);
+
     return NextResponse.json({
       _id: order._id,
-      status: order.status,
 
+      status: order.status,
+      closedReason: order.closedReason || null,
+
+      orderType: order.type,
       tableNumber,
-      parcelNumber: order.type === 'parcel' ? order.parcelNumber : null,
+      parcelNumber: order.type === 'parcel' ? order.parcelNumber || null : null,
 
       openedAt: order.createdAt,
-      closedAt: order.closedAt || order.updatedAt,
+      closedAt: order.closedAt || order.updatedAt || null,
 
       billNumber: bill?.billNumber || null,
       totalAmount: bill?.totalAmount || 0,
       isPaid: bill?.isPaid || false,
 
+      summary: {
+        total,
+        servedTotal,
+        cancelledTotal,
+        wastedTotal,
+      },
+
       payments,
       items,
     });
-
   } catch (err: any) {
     console.error('Admin Order Detail Error:', err);
 
     return NextResponse.json(
-      { error: err.message },
-      { status: 500 }
+      { error: err.message || 'Failed to load order detail' },
+      { status: 500 },
     );
   }
 }

@@ -16,22 +16,10 @@ export default function AdminDashboardPage() {
           cache: 'no-store',
         });
 
-        if (!res.ok) {
-          console.error('API failed');
-          return;
-        }
+        if (!res.ok) return;
 
-        const text = await res.text();
-
-        let parsed;
-        try {
-          parsed = JSON.parse(text);
-        } catch {
-          console.error('Invalid JSON response');
-          return;
-        }
-
-        setData(parsed);
+        const json = await res.json(); // 🔥 FIXED (no manual parse)
+        setData(json);
       } catch (err) {
         console.error(err);
       }
@@ -42,9 +30,7 @@ export default function AdminDashboardPage() {
 
   if (!data || !data.tables) {
     return (
-      <div className="p-8 text-gray-500 text-center">
-        Loading dashboard...
-      </div>
+      <div className="p-8 text-gray-500 text-center">Loading dashboard...</div>
     );
   }
 
@@ -53,13 +39,7 @@ export default function AdminDashboardPage() {
       <h1 className="text-3xl font-bold">Admin Dashboard</h1>
 
       {/* TABLES */}
-      <DashboardSection title="Tables">
-        <ClickableCard
-          title="Total Tables"
-          value={data.tables?.totalTables || 0}
-          onClick={() => router.push('/counter/tables')}
-        />
-
+      <DashboardSection title="Tables / Parcel">
         <ClickableCard
           title="Free Tables"
           value={data.tables?.freeTables || 0}
@@ -71,38 +51,50 @@ export default function AdminDashboardPage() {
           value={data.tables?.occupiedTables || 0}
           onClick={() => router.push('/counter/tables?status=occupied')}
         />
+        <ClickableCard
+          title="Parcel Status"
+          value={`P-${data.parcel?.currentParcelNumber || 0} / D-${data.parcel?.lastDeliveredParcelNumber || 0}`}
+          onClick={() => router.push('/counter/parcel')}
+        />
       </DashboardSection>
 
       {/* ORDERS */}
       <DashboardSection title="Orders">
         <ClickableCard
-          title="Running Tables"
-          value={data.orders?.runningOrders || 0}
-          onClick={() => router.push('/admin/orders?status=running')}
+          title="New Orders"
+          value={'🥳'}
+          onClick={() => router.push('/counter/tables')}
+        />
+        <ClickableCard
+          title="Running Orders"
+          value={
+            (data.orders?.runningTableOrders || 0) +
+            (data.orders?.runningParcelOrders || 0)
+          }
+          onClick={() => router.push('/admin/orders')}
         />
 
         <ClickableCard
-          title="Running Parcels"
-          value={data.orders?.runningParcels || 0}
-          onClick={() => router.push('/counter/parcel')}
-        />
-
-        <ClickableCard
-          title="Closed Orders"
-          value={data.orders?.closedOrders || 0}
-          onClick={() => router.push('/admin/orders?status=closed')}
+          title="Completed Orders"
+          value={data.orders?.completedOrders || 0}
+          onClick={() => router.push('/admin/orders?orderType=completed')}
         />
 
         <ClickableCard
           title="Kitchen Pending"
           value={data.orders?.unservedItems || 0}
-          onClick={() => router.push('/kitchen/orders')}
+          onClick={() => router.push('/kitchen/orders?tab=pending')}
         />
 
         <ClickableCard
           title="Ready Items"
           value={data.orders?.readyItems || 0}
-          onClick={() => router.push('/kitchen/orders')}
+          onClick={() => router.push('/kitchen/orders?tab=ready')}
+        />
+        <ClickableCard
+          title="Cancelled Orders"
+          value={data.orders?.forceClosedOrders || 0}
+          onClick={() => router.push('/admin/orders?orderType=force_closed')}
         />
       </DashboardSection>
 

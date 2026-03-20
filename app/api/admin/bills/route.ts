@@ -19,20 +19,37 @@ export async function GET(req: Request) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    const skip = (page - 1) * limit;
+    const pending = searchParams.get('pending');
+    const today = searchParams.get('today');
 
-    /* ================= FILTER ================= */
+    const skip = (page - 1) * limit;
 
     const query: any = {};
 
-    /* ✅ BILL NUMBER */
     if (billNumber) {
       query.billNumber = Number(billNumber);
     }
 
-    /* ✅ DATE FILTER (USE createdAt NOT printedAt) */
+    if (pending === 'true') {
+      query.isPaid = false;
+      query.isRefunded = false;
+    }
+
+    if (today === 'true') {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+
+      const end = new Date();
+      end.setHours(23, 59, 59, 999);
+
+      query.createdAt = {
+        $gte: start,
+        $lte: end,
+      };
+    }
+
     if (startDate || endDate) {
-      query.createdAt = {};
+      query.createdAt = query.createdAt || {};
 
       if (startDate) {
         query.createdAt.$gte = new Date(startDate);
@@ -45,14 +62,14 @@ export async function GET(req: Request) {
       }
     }
 
-    /* ================= FETCH ================= */
-
     const [bills, total] = await Promise.all([
       Bill.find(query)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .select('billNumber totalAmount isPaid isRefunded printedAt createdAt')
+        .select(
+          'orderId billNumber totalAmount isPaid isRefunded printedAt createdAt',
+        )
         .lean(),
 
       Bill.countDocuments(query),
@@ -65,13 +82,9 @@ export async function GET(req: Request) {
       limit,
       totalPages: Math.ceil(total / limit),
     });
-
   } catch (err: any) {
     console.error('Bills API Error:', err);
 
-    return NextResponse.json(
-      { error: err.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
