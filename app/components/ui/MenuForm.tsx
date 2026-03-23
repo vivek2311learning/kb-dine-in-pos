@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { Card } from '@/app/components/ui/card';
@@ -15,6 +15,12 @@ interface MenuItem {
   category: string;
 }
 
+interface MenuCategory {
+  _id: string;
+  name: string;
+  isActive: boolean;
+}
+
 interface Props {
   initialData?: MenuItem;
   isEdit?: boolean;
@@ -27,37 +33,120 @@ export default function MenuForm({ initialData, isEdit }: Props) {
     name: initialData?.name || '',
     description: initialData?.description || '',
     price: initialData?.price || 0,
-    category: initialData?.category || 'Starters',
+    category: initialData?.category || '',
   });
 
+  const [categories, setCategories] = useState<MenuCategory[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [loading, setLoading] = useState(false);
 
-  const updateField = (field: keyof MenuItem, value: any) => {
+  const updateField = (field: keyof MenuItem, value: string | number) => {
     setForm((prev) => ({
       ...prev,
       [field]: value,
     }));
   };
 
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        setCategoriesLoading(true);
+
+        const res = await fetch('/api/admin/menu-categories', {
+          cache: 'no-store',
+          credentials: 'include',
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          console.error(data);
+          alert(data.error || 'Failed to load categories');
+          return;
+        }
+
+        const activeCategories = (data || []).filter(
+          (cat: MenuCategory) => cat.isActive,
+        );
+
+        setCategories(activeCategories);
+
+        setForm((prev) => {
+          if (prev.category) return prev;
+
+          return {
+            ...prev,
+            category: activeCategories[0]?.name || '',
+          };
+        });
+      } catch (err) {
+        console.error(err);
+        alert('Failed to load categories');
+      } finally {
+        setCategoriesLoading(false);
+      }
+    };
+
+    loadCategories();
+  }, []);
+
   const handleSubmit = async () => {
-    if (!form.name || !form.price) return;
+    if (!form.name.trim()) {
+      alert('Name is required');
+      return;
+    }
 
-    setLoading(true);
+    if (!form.description.trim()) {
+      alert('Description is required');
+      return;
+    }
 
-    const url = isEdit
-      ? `/api/admin/menu/${initialData?._id}`
-      : `/api/admin/menu`;
+    if (!form.price || form.price <= 0) {
+      alert('Enter valid price');
+      return;
+    }
 
-    const method = isEdit ? 'PATCH' : 'POST';
+    if (!form.category.trim()) {
+      alert('Category is required');
+      return;
+    }
 
-    await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    });
+    try {
+      setLoading(true);
 
-    router.push('/admin/menu');
-    router.refresh();
+      const url = isEdit
+        ? `/api/admin/menu/${initialData?._id}`
+        : '/api/admin/menu';
+
+      const method = isEdit ? 'PATCH' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          ...form,
+          name: form.name.trim(),
+          description: form.description.trim(),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.error(data);
+        alert(data.error || 'Failed to save item');
+        return;
+      }
+
+      router.push('/admin/menu');
+      router.refresh();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save item');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -65,6 +154,7 @@ export default function MenuForm({ initialData, isEdit }: Props) {
       <h1 className="text-2xl font-bold">
         {isEdit ? 'Edit Menu Item' : 'Add Menu Item'}
       </h1>
+
       <Input
         label="Name"
         value={form.name}
@@ -96,15 +186,29 @@ export default function MenuForm({ initialData, isEdit }: Props) {
           className="w-full border rounded-lg px-4 py-2"
           value={form.category}
           onChange={(e) => updateField('category', e.target.value)}
+          disabled={categoriesLoading || loading || categories.length === 0}
         >
-          <option>Starters</option>
-          <option>Main Course</option>
-          <option>Beverages</option>
-          <option>Desserts</option>
+          {categories.length === 0 ? (
+            <option value="">
+              {categoriesLoading
+                ? 'Loading categories...'
+                : 'No categories available'}
+            </option>
+          ) : (
+            categories.map((category) => (
+              <option key={category._id} value={category.name}>
+                {category.name}
+              </option>
+            ))
+          )}
         </select>
       </div>
 
-      <Button onClick={handleSubmit} className="w-full" disabled={loading}>
+      <Button
+        onClick={handleSubmit}
+        className="w-full"
+        disabled={loading || categoriesLoading || categories.length === 0}
+      >
         {loading ? 'Saving...' : 'Save Item'}
       </Button>
     </Card>

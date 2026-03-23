@@ -4,27 +4,26 @@ import { NextResponse } from 'next/server';
 import { connectDB } from '@/app/lib/db';
 import MenuItem from '@/app/lib/models/MenuItem';
 
-let menuCache: any = null;
-let cacheTime = 0;
-
 export async function GET() {
-  const now = Date.now();
+  try {
+    await connectDB();
 
-  /* ✅ 5 min cache (better) */
-  if (menuCache && now - cacheTime < 300000) {
-    return NextResponse.json(menuCache);
+    const items = await MenuItem.find({ status: 'active' })
+      .select('_id name description price category')
+      .sort({ category: 1, name: 1 })
+      .lean();
+
+    return NextResponse.json(items, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+      },
+    });
+  } catch (err) {
+    console.error('Public Menu Fetch Error:', err);
+
+    return NextResponse.json(
+      { error: 'Failed to fetch menu' },
+      { status: 500 },
+    );
   }
-
-  await connectDB();
-
-  /* ✅ only active items */
-  const items = await MenuItem.find({ status: 'active' })
-    .select('name price category') // ⚡ reduce payload
-    .sort({ category: 1, name: 1 })
-    .lean();
-
-  menuCache = items;
-  cacheTime = now;
-
-  return NextResponse.json(items);
 }

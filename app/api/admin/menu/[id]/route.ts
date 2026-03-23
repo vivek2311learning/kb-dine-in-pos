@@ -1,9 +1,10 @@
-
 import { NextResponse } from 'next/server';
+import mongoose from 'mongoose';
+
 import { connectDB } from '@/app/lib/db';
 import MenuItem from '@/app/lib/models/MenuItem';
+import MenuCategory from '@/app/lib/models/menuCategory';
 import { requireRole } from '@/app/lib/auth/requireRole';
-import mongoose from 'mongoose';
 
 export async function PATCH(
   req: Request,
@@ -33,29 +34,13 @@ export async function PATCH(
       );
     }
 
-    /* STATUS ACTIONS */
-
     if (body.action) {
-      switch (body.action) {
-        case 'activate':
-          item.status = 'active';
-          item.archivedAt = undefined;
-          break;
-
-        case 'disable':
-          item.status = 'unavailable';
-          break;
-
-        case 'archive':
-          item.status = 'archived';
-          item.archivedAt = new Date();
-          break;
-
-        default:
-          return NextResponse.json(
-            { error: 'Invalid action' },
-            { status: 400 },
-          );
+      if (body.action === 'activate') {
+        item.status = 'active';
+      } else if (body.action === 'disable') {
+        item.status = 'unavailable';
+      } else {
+        return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
       }
 
       await item.save();
@@ -66,10 +51,75 @@ export async function PATCH(
       });
     }
 
-    /* NORMAL UPDATE */
+    const updateData: Record<string, any> = {};
 
-    const updated = await MenuItem.findByIdAndUpdate(id, body, {
+    if (typeof body.name === 'string') {
+      const name = body.name.trim();
+
+      if (!name) {
+        return NextResponse.json(
+          { error: 'Name is required' },
+          { status: 400 },
+        );
+      }
+
+      updateData.name = name;
+    }
+
+    if (typeof body.description === 'string') {
+      const description = body.description.trim();
+
+      if (!description) {
+        return NextResponse.json(
+          { error: 'Description is required' },
+          { status: 400 },
+        );
+      }
+
+      updateData.description = description;
+    }
+
+    if (typeof body.category === 'string') {
+      const category = body.category.trim();
+
+      if (!category) {
+        return NextResponse.json(
+          { error: 'Category is required' },
+          { status: 400 },
+        );
+      }
+
+      const categoryDoc = await MenuCategory.findOne({
+        name: category,
+        isActive: true,
+      }).lean();
+
+      if (!categoryDoc) {
+        return NextResponse.json(
+          { error: 'Selected category is invalid or disabled' },
+          { status: 400 },
+        );
+      }
+
+      updateData.category = category;
+    }
+
+    if (body.price !== undefined) {
+      const price = Number(body.price);
+
+      if (!Number.isFinite(price) || price <= 0) {
+        return NextResponse.json(
+          { error: 'Valid price is required' },
+          { status: 400 },
+        );
+      }
+
+      updateData.price = price;
+    }
+
+    const updated = await MenuItem.findByIdAndUpdate(id, updateData, {
       new: true,
+      runValidators: true,
     });
 
     return NextResponse.json({
@@ -88,7 +138,7 @@ export async function PATCH(
 
 export async function DELETE(
   req: Request,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     await requireRole(['admin']);
@@ -103,26 +153,15 @@ export async function DELETE(
       );
     }
 
-    const item = await MenuItem.findByIdAndUpdate(
-      id,
-      {
-        status: 'archived',
-        archivedAt: new Date(),
-      },
-      { new: true }
-    );
+    const deleted = await MenuItem.findByIdAndDelete(id);
 
-    if (!item) {
-      return NextResponse.json(
-        { error: 'Item not found' },
-        { status: 404 },
-      );
+    if (!deleted) {
+      return NextResponse.json({ error: 'Item not found' }, { status: 404 });
     }
 
     return NextResponse.json({
       success: true,
     });
-
   } catch (err) {
     console.error('Menu Delete Error:', err);
 

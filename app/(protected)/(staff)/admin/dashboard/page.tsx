@@ -18,7 +18,7 @@ export default function AdminDashboardPage() {
 
         if (!res.ok) return;
 
-        const json = await res.json(); // 🔥 FIXED (no manual parse)
+        const json = await res.json();
         setData(json);
       } catch (err) {
         console.error(err);
@@ -26,6 +26,10 @@ export default function AdminDashboardPage() {
     };
 
     load();
+
+    const interval = setInterval(load, 10000);
+
+    return () => clearInterval(interval);
   }, []);
 
   if (!data || !data.tables) {

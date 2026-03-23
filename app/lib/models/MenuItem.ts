@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
-export type MenuStatus = 'draft' | 'active' | 'unavailable' | 'archived';
+export type MenuStatus = 'active' | 'unavailable';
 
 export interface IMenuItem extends Document {
   name: string;
@@ -9,7 +9,6 @@ export interface IMenuItem extends Document {
   category: string;
   status: MenuStatus;
   createdBy?: mongoose.Types.ObjectId;
-  archivedAt?: Date;
 }
 
 const MenuItemSchema = new Schema<IMenuItem>(
@@ -42,18 +41,14 @@ const MenuItemSchema = new Schema<IMenuItem>(
 
     status: {
       type: String,
-      enum: ['draft', 'active', 'unavailable', 'archived'],
-      default: 'draft',
+      enum: ['active', 'unavailable'],
+      default: 'active',
       index: true,
     },
 
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: 'User',
-    },
-
-    archivedAt: {
-      type: Date,
     },
   },
   { timestamps: true },

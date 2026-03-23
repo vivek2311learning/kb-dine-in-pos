@@ -7,9 +7,13 @@ export interface IBill extends Document {
   subtotal: number;
   tax: number;
   discount: number;
-  totalAmount: number;
+  adjustAmount: number;
 
-  paidAmount: number; // ✅ NEW
+  totalAmount: number;
+  paidAmount: number;
+
+  customerPhone?: string;
+  shareToken?: string;
 
   printedAt?: Date;
 
@@ -18,20 +22,30 @@ export interface IBill extends Document {
 
   isRefunded: boolean;
   refundAmount?: number;
+  refundReason?: string;
+  refundAt?: Date;
 }
 
 const BillSchema = new Schema<IBill>(
   {
     billNumber: { type: Number, required: true, unique: true },
 
-    orderId: { type: Schema.Types.ObjectId, ref: 'Order', required: true },
+    orderId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Order',
+      required: true,
+    },
 
-    subtotal: Number,
-    tax: Number,
-    discount: Number,
-    totalAmount: Number,
+    subtotal: { type: Number, default: 0 },
+    tax: { type: Number, default: 0 },
+    discount: { type: Number, default: 0 },
+    adjustAmount: { type: Number, default: 0 },
 
-    paidAmount: { type: Number, default: 0 }, // ✅ important
+    totalAmount: { type: Number, default: 0 },
+    paidAmount: { type: Number, default: 0 },
+
+    customerPhone: { type: String },
+    shareToken: { type: String, unique: true, sparse: true },
 
     printedAt: Date,
 
@@ -40,6 +54,8 @@ const BillSchema = new Schema<IBill>(
 
     isRefunded: { type: Boolean, default: false },
     refundAmount: Number,
+    refundReason: String,
+    refundAt: Date,
   },
   { timestamps: true },
 );

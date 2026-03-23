@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
-import { Select } from '@/app/components/ui/select';
 
 type Role = 'admin' | 'counter' | 'kitchen';
 
@@ -29,23 +28,40 @@ export default function StaffForm({ initialData, isEdit = false }: Props) {
   const [email, setEmail] = useState(initialData?.email || '');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<Role>(initialData?.role || 'counter');
-
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const body: any = {
-      name,
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+
+    if (!trimmedName) {
+      alert('Name is required');
+      return;
+    }
+
+    if (!isEdit && !trimmedEmail) {
+      alert('Email is required');
+      return;
+    }
+
+    if (!isEdit && !password.trim()) {
+      alert('Password is required');
+      return;
+    }
+
+    const body: Record<string, any> = {
+      name: trimmedName,
       role,
     };
 
     if (!isEdit) {
-      body.email = email;
+      body.email = trimmedEmail;
       body.password = password;
     }
 
-    if (isEdit && password) {
+    if (isEdit && password.trim()) {
       body.password = password;
     }
 
@@ -58,26 +74,35 @@ export default function StaffForm({ initialData, isEdit = false }: Props) {
     try {
       setLoading(true);
 
-      await fetch(url, {
+      const res = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify(body),
       });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || 'Failed to save staff');
+        return;
+      }
 
       router.push('/admin/staff');
       router.refresh();
     } catch (error) {
       console.error('Staff save failed', error);
+      alert('Failed to save staff');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Card padding="lg" className="max-w-md mx-auto space-y-6">
-      <h1 className="text-2xl font-rustic">
+    <Card className="max-w-md mx-auto p-6 space-y-6">
+      <h1 className="text-2xl font-bold">
         {isEdit ? 'Edit Staff Member' : 'Create Staff Member'}
       </h1>
 
@@ -108,15 +133,22 @@ export default function StaffForm({ initialData, isEdit = false }: Props) {
           onChange={(e) => setPassword(e.target.value)}
         />
 
-        <Select
-          label="Role"
-          value={role}
-          onChange={(e) => setRole(e.target.value as Role)}
-        >
-          <option value="admin">Admin</option>
-          <option value="counter">Counter</option>
-          <option value="kitchen">Kitchen</option>
-        </Select>
+        <div className="space-y-1">
+          <label className="text-sm font-medium" htmlFor="role">
+            Role
+          </label>
+
+          <select
+            id="role"
+            value={role}
+            onChange={(e) => setRole(e.target.value as Role)}
+            className="w-full border rounded-lg px-4 py-2"
+          >
+            <option value="admin">Admin</option>
+            <option value="counter">Counter</option>
+            <option value="kitchen">Kitchen</option>
+          </select>
+        </div>
 
         <Button type="submit" disabled={loading} className="w-full">
           {loading ? 'Saving...' : isEdit ? 'Update Staff' : 'Create Staff'}

@@ -43,37 +43,39 @@ export default function BillDetailPage() {
     loadBill();
   }, [billId]);
 
-  const handlePrint = () => {
-    const content = document.getElementById('bill-print')?.innerHTML;
-    if (!content) return;
+  const handlePrint = async () => {
+    try {
+      const res = await fetch(`/api/counter/bills/${billId}/print`, {
+        credentials: 'include',
+      });
 
-    const win = window.open('', '_blank');
-    if (!win) return;
+      if (!res.ok) {
+        alert('Print failed');
+        return;
+      }
 
-    win.document.write(`
-      <html>
-        <head>
-          <title>Bill #${bill.billNumber}</title>
-          <style>
-            body { font-family: sans-serif; padding: 20px; }
-            .row { display: flex; justify-content: space-between; }
-          </style>
-        </head>
-        <body>${content}</body>
-      </html>
-    `);
+      const html = await res.text();
+      const win = window.open('', '_blank');
 
-    win.document.close();
+      if (!win) return;
 
-    setTimeout(() => {
-      win.print();
-      win.close();
-    }, 300);
+      win.document.open();
+      win.document.write(html);
+      win.document.close();
+
+      setTimeout(() => {
+        win.print();
+        win.close();
+      }, 300);
+    } catch (err) {
+      console.error(err);
+      alert('Print failed');
+    }
   };
 
   const handlePayment = () => {
-    if (!bill?.orderId) return;
-    router.push(`/counter/bill/${bill.orderId}`);
+    if (!bill?._id) return;
+    router.push(`/counter/payment/${bill._id}`);
   };
 
   const handleRefund = async () => {
@@ -83,7 +85,7 @@ export default function BillDetailPage() {
       setActionLoading(true);
 
       const res = await fetch(`/api/admin/bills/${billId}/refund`, {
-        method: 'PATCH',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
@@ -106,6 +108,11 @@ export default function BillDetailPage() {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const handleOpenSharedBill = () => {
+    if (!bill?.shareUrl) return;
+    window.open(bill.shareUrl, '_blank');
   };
 
   if (loading) return <div className="p-6 text-gray-500">Loading...</div>;
@@ -131,6 +138,12 @@ export default function BillDetailPage() {
           <p className="text-xs text-gray-500">
             {bill.printedAt ? new Date(bill.printedAt).toLocaleString() : '—'}
           </p>
+
+          {bill.customerPhone && (
+            <p className="text-xs text-gray-500 mt-1">
+              Customer: {bill.customerPhone}
+            </p>
+          )}
         </div>
 
         <span className={`font-semibold ${statusClass}`}>{statusLabel}</span>
@@ -139,8 +152,8 @@ export default function BillDetailPage() {
       <div id="bill-print" className="space-y-4">
         <Card className="p-4 space-y-2">
           {bill.items?.length ? (
-            bill.items.map((i: any) => (
-              <div key={i._id} className="flex justify-between text-sm">
+            bill.items.map((i: any, index: number) => (
+              <div key={index} className="flex justify-between text-sm">
                 <span>
                   {i.nameSnapshot} × {i.quantity}
                 </span>
@@ -158,19 +171,29 @@ export default function BillDetailPage() {
             <span>₹{bill.subtotal || 0}</span>
           </div>
 
+          <div className="flex justify-between text-sm text-red-600">
+            <span>Discount</span>
+            <span>- ₹{bill.discount || 0}</span>
+          </div>
+
+          <div className="flex justify-between text-sm text-red-600">
+            <span>Adjust Amount</span>
+            <span>- ₹{bill.adjustAmount || 0}</span>
+          </div>
+
           <div className="flex justify-between text-sm">
             <span>Tax</span>
             <span>₹{bill.tax || 0}</span>
           </div>
 
-          <div className="flex justify-between text-sm">
-            <span>Discount</span>
-            <span>₹{bill.discount || 0}</span>
-          </div>
-
           <div className="flex justify-between font-bold text-lg pt-2 border-t">
             <span>Total</span>
-            <span>₹{bill.totalAmount}</span>
+            <span>₹{bill.totalAmount || 0}</span>
+          </div>
+
+          <div className="flex justify-between text-sm">
+            <span>Paid Amount</span>
+            <span>₹{bill.paidAmount || 0}</span>
           </div>
         </Card>
 
@@ -186,10 +209,39 @@ export default function BillDetailPage() {
             ))}
           </Card>
         )}
+
+        {bill.isRefunded && (
+          <Card className="p-4 space-y-2">
+            <h2 className="font-semibold text-red-600">Refund Details</h2>
+
+            <div className="flex justify-between text-sm">
+              <span>Refund Amount</span>
+              <span>₹{bill.refundAmount || 0}</span>
+            </div>
+
+            <div className="flex justify-between text-sm">
+              <span>Refund Reason</span>
+              <span>{bill.refundReason || '—'}</span>
+            </div>
+
+            <div className="flex justify-between text-sm">
+              <span>Refunded At</span>
+              <span>
+                {bill.refundAt ? new Date(bill.refundAt).toLocaleString() : '—'}
+              </span>
+            </div>
+          </Card>
+        )}
       </div>
 
       <div className="flex gap-3 flex-wrap">
         <Button onClick={handlePrint}>Reprint Bill</Button>
+
+        {bill.shareUrl && (
+          <Button variant="outline" onClick={handleOpenSharedBill}>
+            View Shared Bill
+          </Button>
+        )}
 
         {!bill.isPaid && !bill.isRefunded && (
           <Button className="bg-green-600" onClick={handlePayment}>

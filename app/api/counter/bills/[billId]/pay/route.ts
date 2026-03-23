@@ -23,8 +23,6 @@ export async function PATCH(
     await requireRole(['counter', 'admin']);
     await connectDB();
 
-    session.startTransaction();
-
     const { billId } = await params;
     const { payments } = await req.json();
 
@@ -36,10 +34,17 @@ export async function PATCH(
       throw new Error('Payments are required');
     }
 
-    const bill = await Bill.findById(billId).session(session);
-    if (!bill) throw new Error('Bill not found');
+    session.startTransaction();
 
-    if (bill.isPaid) throw new Error('Already paid');
+    const bill = await Bill.findById(billId).session(session);
+
+    if (!bill) {
+      throw new Error('Bill not found');
+    }
+
+    if (bill.isPaid) {
+      throw new Error('Bill already paid');
+    }
 
     const totalPaid = payments.reduce(
       (sum: number, p: any) => sum + Number(p.amount || 0),
@@ -51,26 +56,33 @@ export async function PATCH(
     }
 
     const token = (await cookies()).get('auth_token')?.value;
-    if (!token) throw new Error('Not authenticated');
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
 
     const payload: any = await verifyToken(token);
 
-    await Payment.insertMany(
-      payments.map((p: any) => ({
-        billId: bill._id,
-        method: p.method,
-        amount: Number(p.amount),
-        receivedBy: payload.userId,
-      })),
-      { session },
-    );
+    const paymentDocs = payments.map((p: any) => ({
+      billId: bill._id,
+      method: p.method,
+      amount: Number(p.amount),
+      receivedBy: payload.userId,
+    }));
+
+    for (const payment of paymentDocs) {
+      await Payment.create([payment], { session });
+    }
 
     bill.isPaid = true;
     bill.paidAt = new Date();
+    bill.paidAmount = totalPaid;
     await bill.save({ session });
 
     const order = await Order.findById(bill.orderId).session(session);
-    if (!order) throw new Error('Order not found');
+
+    if (!order) {
+      throw new Error('Order not found');
+    }
 
     if (order.status === 'closed') {
       throw new Error('Order already closed');
@@ -82,8 +94,11 @@ export async function PATCH(
     await order.save({ session });
 
     if (order.tableId) {
-      await Table.findByIdAndUpdate(
-        order.tableId,
+      await Table.updateOne(
+        {
+          _id: order.tableId,
+          currentOrderId: order._id,
+        },
         {
           status: 'free',
           currentOrderId: null,
@@ -96,6 +111,7 @@ export async function PATCH(
 
     return NextResponse.json({
       success: true,
+      billId: bill._id,
       orderId: order._id,
       status: 'closed',
       closedReason: 'completed',

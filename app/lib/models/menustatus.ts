@@ -8,13 +8,12 @@ export interface IMenuItem extends Document {
   category: string;
   status: MenuStatus;
   createdBy?: mongoose.Types.ObjectId;
-  archivedAt?: Date;
 }
 
 const MenuItemSchema = new Schema<IMenuItem>(
   {
-    name: { type: String, required: true },
-    description: { type: String, required: true },
+    name: { type: String, required: true, trim: true },
+    description: { type: String, required: true, trim: true },
     price: { type: Number, required: true },
 
     category: {
@@ -26,18 +25,14 @@ const MenuItemSchema = new Schema<IMenuItem>(
 
     status: {
       type: String,
-      enum: ['draft', 'active', 'unavailable', 'archived'],
-      default: 'draft',
+      enum: ['active', 'unavailable'],
+      default: 'active',
       index: true,
     },
 
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: 'User',
-    },
-
-    archivedAt: {
-      type: Date,
     },
   },
   { timestamps: true },

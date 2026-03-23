@@ -24,7 +24,7 @@ export async function GET(
 
     const bill = await Bill.findById(id)
       .select(
-        'orderId billNumber totalAmount subtotal tax discount isPaid paidAt isRefunded refundAt refundReason printedAt createdAt',
+        'orderId billNumber subtotal tax discount adjustAmount totalAmount paidAmount customerPhone shareToken isPaid paidAt isRefunded refundAmount refundAt refundReason printedAt createdAt',
       )
       .lean();
 
@@ -35,29 +35,48 @@ export async function GET(
     const [items, payments] = await Promise.all([
       OrderItem.find({
         orderId: bill.orderId,
+        served: true,
         cancelled: false,
         wasted: false,
       })
         .select('nameSnapshot priceSnapshot quantity served')
+        .sort({ createdAt: 1 })
         .lean(),
 
       Payment.find({ billId: id }).select('method amount').lean(),
     ]);
 
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin;
+
     return NextResponse.json({
       _id: bill._id,
       orderId: bill.orderId,
+
       billNumber: bill.billNumber,
+
       subtotal: bill.subtotal || 0,
       tax: bill.tax || 0,
       discount: bill.discount || 0,
+      adjustAmount: bill.adjustAmount || 0,
       totalAmount: bill.totalAmount || 0,
+      paidAmount: bill.paidAmount || 0,
+
+      customerPhone: bill.customerPhone || '',
+      shareToken: bill.shareToken || null,
+      shareUrl: bill.shareToken
+        ? `${appUrl}/bill/share/${bill.shareToken}`
+        : null,
+
       isPaid: !!bill.isPaid,
       paidAt: bill.paidAt || null,
+
       isRefunded: !!bill.isRefunded,
+      refundAmount: bill.refundAmount || 0,
       refundAt: bill.refundAt || null,
       refundReason: bill.refundReason || null,
+
       printedAt: bill.printedAt || bill.createdAt || null,
+
       items,
       payments,
     });

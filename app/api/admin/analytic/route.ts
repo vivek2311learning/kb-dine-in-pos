@@ -53,8 +53,7 @@ export async function GET() {
       /* PARCEL NUMBERS */
       Order.findOne({
         type: 'parcel',
-        status: 'running',
-        parcelDelivered: false,
+        parcelNumber: { $exists: true, $ne: null },
       })
         .sort({ parcelNumber: -1 })
         .select('parcelNumber')
@@ -62,12 +61,13 @@ export async function GET() {
 
       Order.findOne({
         type: 'parcel',
-        parcelDelivered: true,
+        status: 'closed',
+        closedReason: 'completed',
+        parcelNumber: { $exists: true, $ne: null },
       })
         .sort({ parcelNumber: -1 })
         .select('parcelNumber')
         .lean(),
-
       /* RUNNING ORDERS */
       Order.countDocuments({
         status: 'running',
@@ -154,7 +154,6 @@ export async function GET() {
 
       /* STAFF */
       User.countDocuments({
-        role: { $in: ['counter', 'kitchen'] },
         isActive: true,
       }),
 
