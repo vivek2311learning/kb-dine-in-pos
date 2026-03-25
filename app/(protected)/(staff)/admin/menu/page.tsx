@@ -21,9 +21,12 @@ export default function AdminMenuPage() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const fetchItems = async () => {
     try {
+      setLoading(true);
+
       const res = await fetch('/api/admin/menu', {
         cache: 'no-store',
         credentials: 'include',
@@ -32,7 +35,6 @@ export default function AdminMenuPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        console.error(data);
         alert(data.error || 'Failed to load menu');
         return;
       }
@@ -41,6 +43,8 @@ export default function AdminMenuPage() {
     } catch (err) {
       console.error(err);
       alert('Failed to load menu');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -48,10 +52,20 @@ export default function AdminMenuPage() {
     fetchItems();
   }, []);
 
+  /* 🔥 Optimistic Update (FAST UI) */
   const updateStatus = async (id: string, action: 'activate' | 'disable') => {
-    try {
-      setLoadingId(id);
+    setLoadingId(id);
 
+    // instant UI change
+    setItems((prev) =>
+      prev.map((i) =>
+        i._id === id
+          ? { ...i, status: action === 'activate' ? 'active' : 'unavailable' }
+          : i,
+      ),
+    );
+
+    try {
       const res = await fetch(`/api/admin/menu/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -59,48 +73,35 @@ export default function AdminMenuPage() {
         body: JSON.stringify({ action }),
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        console.error(data);
-        alert(data.error || 'Status update failed');
-        return;
+        fetchItems(); // rollback
       }
-
-      await fetchItems();
-    } catch (err) {
-      console.error(err);
-      alert('Status update failed');
+    } catch {
+      fetchItems(); // rollback
     } finally {
       setLoadingId(null);
     }
   };
 
   const deleteItem = async (id: string) => {
-    if (!confirm('Permanently delete this item? This cannot be undone.')) {
-      return;
-    }
+    if (!confirm('Permanently delete this item?')) return;
+
+    setLoadingId(id);
+
+    // instant remove
+    setItems((prev) => prev.filter((i) => i._id !== id));
 
     try {
-      setLoadingId(id);
-
       const res = await fetch(`/api/admin/menu/${id}`, {
         method: 'DELETE',
         credentials: 'include',
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        console.error(data);
-        alert(data.error || 'Delete failed');
-        return;
+        fetchItems(); // rollback
       }
-
-      await fetchItems();
-    } catch (err) {
-      console.error(err);
-      alert('Delete failed');
+    } catch {
+      fetchItems();
     } finally {
       setLoadingId(null);
     }
@@ -119,124 +120,158 @@ export default function AdminMenuPage() {
     );
   }, [items, category, search]);
 
-  const getStatusLabel = (status: MenuItem['status']) => {
-    return status === 'active' ? 'Enabled' : 'Disabled';
+  const getStatusStyle = (status: MenuItem['status']) => {
+    return status === 'active'
+      ? 'text-green-700 border-green-200 bg-green-50/60'
+      : 'text-red-700 border-red-200 bg-red-50/60';
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6">
-      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
-        <h1 className="text-2xl md:text-3xl font-bold">Menu Management</h1>
+    <div className="px-3 py-4 sm:px-4 md:px-6 md:py-6">
+      <div className="mx-auto max-w-6xl space-y-6">
+        {/* HEADER */}
+        <div className="flex flex-col gap-3 md:flex-row md:justify-between md:items-center">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold">Menu Management</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Manage menu items, availability, and categories.
+            </p>
+          </div>
 
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => router.push('/admin/menu/categories')}
-          >
-            Categories
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => router.push('/admin/menu/categories')}
+            >
+              Categories
+            </Button>
 
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => router.push('/admin/menu/new')}
-            className="text-white"
-          >
-            + Add Item
-          </Button>
+            <Button onClick={() => router.push('/admin/menu/new')}>
+              + Add Item
+            </Button>
+          </div>
         </div>
-      </div>
 
-      <input
-        placeholder="Search menu..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="w-full md:max-w-md border rounded-lg px-4 py-2"
-      />
-
-      <div className="flex gap-2 overflow-x-auto pb-2">
-        <Button
-          type="button"
-          onClick={() => setCategory('')}
-          className={category === '' ? 'bg-black text-white' : 'bg-gray-200'}
+        {/* FILTERS */}
+        <Card
+          variant="ghost"
+          hover={false}
+          className="p-4 border border-[#3b2a1a]/15 bg-transparent shadow-none"
         >
-          All
-        </Button>
+          <div className="space-y-4">
+            <input
+              placeholder="Search menu items..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full md:max-w-md rounded-xl border border-[#3b2a1a]/15 px-4 py-2.5 outline-none"
+            />
 
-        {categories.map((cat) => (
-          <Button
-            type="button"
-            key={cat}
-            onClick={() => setCategory(cat)}
-            className={category === cat ? 'bg-black text-white' : 'bg-gray-200'}
-          >
-            {cat}
-          </Button>
-        ))}
+            <div className="flex gap-2 overflow-x-auto">
+              <Button
+                size="sm"
+                onClick={() => setCategory('')}
+                variant={category === '' ? 'primary' : 'outline'}
+              >
+                All
+              </Button>
+
+              {categories.map((cat) => (
+                <Button
+                  key={cat}
+                  size="sm"
+                  onClick={() => setCategory(cat)}
+                  variant={category === cat ? 'primary' : 'outline'}
+                >
+                  {cat}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </Card>
+
+        {/* LIST */}
+        {loading ? (
+          <Card className="p-8 text-center">Loading menu...</Card>
+        ) : filtered.length === 0 ? (
+          <Card className="p-8 text-center">No menu items found.</Card>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {filtered.map((item) => (
+              <Card
+                key={item._id}
+                variant="ghost"
+                hover={false}
+                className="p-5 border border-[#3b2a1a]/15 bg-transparent shadow-none"
+              >
+                <div className="space-y-3">
+                  <div>
+                    <p className="font-semibold text-lg">{item.name}</p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {item.category}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-lg font-bold">₹{item.price}</span>
+
+                    <span
+                      className={`text-xs px-2 py-1 rounded border ${getStatusStyle(
+                        item.status,
+                      )}`}
+                    >
+                      {item.status === 'active' ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        router.push(`/admin/menu/${item._id}/edit`)
+                      }
+                    >
+                      Edit
+                    </Button>
+
+                    {item.status === 'active' ? (
+                      <Button
+                        size="sm"
+                        className="border-red-500 text-red-700"
+                        variant="outline"
+                        onClick={() => updateStatus(item._id, 'disable')}
+                        disabled={loadingId === item._id}
+                      >
+                        Disable
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        className="border-green-600 text-green-700"
+                        variant="outline"
+                        onClick={() => updateStatus(item._id, 'activate')}
+                        disabled={loadingId === item._id}
+                      >
+                        Enable
+                      </Button>
+                    )}
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-gray-500 text-gray-700"
+                      onClick={() => deleteItem(item._id)}
+                      disabled={loadingId === item._id}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
-
-      {filtered.length === 0 ? (
-        <div className="text-sm text-gray-500 border rounded-lg p-6 bg-white">
-          No menu items found.
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {filtered.map((item) => (
-            <Card key={item._id} className="p-4">
-              <div className="flex flex-col md:flex-row md:justify-between gap-4">
-                <div>
-                  <p className="font-semibold text-lg">{item.name}</p>
-                  <p className="text-xl">
-                    ₹{item.price} • {item.category}
-                  </p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Status: {getStatusLabel(item.status)}
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    onClick={() => router.push(`/admin/menu/${item._id}/edit`)}
-                  >
-                    Edit
-                  </Button>
-
-                  {item.status === 'active' ? (
-                    <Button
-                      type="button"
-                      onClick={() => updateStatus(item._id, 'disable')}
-                      className="bg-red-600 text-white"
-                      disabled={loadingId === item._id}
-                    >
-                      {loadingId === item._id ? 'Working...' : 'Disable'}
-                    </Button>
-                  ) : (
-                    <Button
-                      type="button"
-                      onClick={() => updateStatus(item._id, 'activate')}
-                      className="bg-green-600 text-white"
-                      disabled={loadingId === item._id}
-                    >
-                      {loadingId === item._id ? 'Working...' : 'Enable'}
-                    </Button>
-                  )}
-
-                  <Button
-                    type="button"
-                    onClick={() => deleteItem(item._id)}
-                    className="bg-gray-700 text-white"
-                    disabled={loadingId === item._id}
-                  >
-                    {loadingId === item._id ? 'Working...' : 'Delete'}
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

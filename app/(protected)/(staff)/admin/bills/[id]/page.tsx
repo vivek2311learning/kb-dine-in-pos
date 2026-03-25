@@ -115,8 +115,13 @@ export default function BillDetailPage() {
     window.open(bill.shareUrl, '_blank');
   };
 
-  if (loading) return <div className="p-6 text-gray-500">Loading...</div>;
-  if (!bill) return <div className="p-6">Not found</div>;
+  if (loading) {
+    return <div className="p-6 text-gray-500">Loading bill...</div>;
+  }
+
+  if (!bill) {
+    return <div className="p-6 text-red-500">Bill not found</div>;
+  }
 
   const statusLabel = bill.isRefunded
     ? 'Refunded'
@@ -125,139 +130,250 @@ export default function BillDetailPage() {
       : 'Unpaid';
 
   const statusClass = bill.isRefunded
-    ? 'text-red-600'
+    ? 'border-red-700 text-red-700 bg-transparent'
     : bill.isPaid
-      ? 'text-green-600'
-      : 'text-yellow-600';
+      ? 'border-green-700 text-green-700 bg-transparent'
+      : 'border-yellow-700 text-yellow-800 bg-transparent';
 
   return (
-    <div className="p-4 md:p-8 max-w-3xl mx-auto space-y-6">
-      <Card className="p-4 flex justify-between items-start">
-        <div>
-          <h1 className="text-2xl font-bold">Bill #{bill.billNumber}</h1>
-          <p className="text-xs text-gray-500">
-            {bill.printedAt ? new Date(bill.printedAt).toLocaleString() : '—'}
-          </p>
-
-          {bill.customerPhone && (
-            <p className="text-xs text-gray-500 mt-1">
-              Customer: {bill.customerPhone}
+    <div className="px-3 py-4 sm:px-4 md:px-6 md:py-6">
+      <div className="mx-auto max-w-5xl space-y-6">
+        {/* HEADER */}
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold">
+              Bill #{bill.billNumber}
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Full bill details, payment status, reprint, and refund actions.
             </p>
-          )}
+          </div>
+
+          <span
+            className={`text-sm px-3 py-1.5 rounded-md border self-start ${statusClass}`}
+          >
+            {statusLabel}
+          </span>
         </div>
 
-        <span className={`font-semibold ${statusClass}`}>{statusLabel}</span>
-      </Card>
-
-      <div id="bill-print" className="space-y-4">
-        <Card className="p-4 space-y-2">
-          {bill.items?.length ? (
-            bill.items.map((i: any, index: number) => (
-              <div key={index} className="flex justify-between text-sm">
-                <span>
-                  {i.nameSnapshot} × {i.quantity}
-                </span>
-                <span>₹{i.priceSnapshot * i.quantity}</span>
-              </div>
-            ))
-          ) : (
-            <p className="text-sm text-gray-500">No items found</p>
-          )}
-        </Card>
-
-        <Card className="p-4 space-y-2">
-          <div className="flex justify-between text-sm">
-            <span>Subtotal</span>
-            <span>₹{bill.subtotal || 0}</span>
-          </div>
-
-          <div className="flex justify-between text-sm text-red-600">
-            <span>Discount</span>
-            <span>- ₹{bill.discount || 0}</span>
-          </div>
-
-          <div className="flex justify-between text-sm text-red-600">
-            <span>Adjust Amount</span>
-            <span>- ₹{bill.adjustAmount || 0}</span>
-          </div>
-
-          <div className="flex justify-between text-sm">
-            <span>Tax</span>
-            <span>₹{bill.tax || 0}</span>
-          </div>
-
-          <div className="flex justify-between font-bold text-lg pt-2 border-t">
-            <span>Total</span>
-            <span>₹{bill.totalAmount || 0}</span>
-          </div>
-
-          <div className="flex justify-between text-sm">
-            <span>Paid Amount</span>
-            <span>₹{bill.paidAmount || 0}</span>
-          </div>
-        </Card>
-
-        {bill.payments?.length > 0 && (
-          <Card className="p-4 space-y-2">
-            <h2 className="font-semibold">Payments</h2>
-
-            {bill.payments.map((p: any, index: number) => (
-              <div key={index} className="flex justify-between text-sm">
-                <span>{String(p.method).toUpperCase()}</span>
-                <span>₹{p.amount}</span>
-              </div>
-            ))}
-          </Card>
-        )}
-
-        {bill.isRefunded && (
-          <Card className="p-4 space-y-2">
-            <h2 className="font-semibold text-red-600">Refund Details</h2>
-
-            <div className="flex justify-between text-sm">
-              <span>Refund Amount</span>
-              <span>₹{bill.refundAmount || 0}</span>
-            </div>
-
-            <div className="flex justify-between text-sm">
-              <span>Refund Reason</span>
-              <span>{bill.refundReason || '—'}</span>
-            </div>
-
-            <div className="flex justify-between text-sm">
-              <span>Refunded At</span>
-              <span>
-                {bill.refundAt ? new Date(bill.refundAt).toLocaleString() : '—'}
-              </span>
-            </div>
-          </Card>
-        )}
-      </div>
-
-      <div className="flex gap-3 flex-wrap">
-        <Button onClick={handlePrint}>Reprint Bill</Button>
-
-        {bill.shareUrl && (
-          <Button variant="outline" onClick={handleOpenSharedBill}>
-            View Shared Bill
-          </Button>
-        )}
-
-        {!bill.isPaid && !bill.isRefunded && (
-          <Button className="bg-green-600" onClick={handlePayment}>
-            Payment
-          </Button>
-        )}
-
-        {bill.isPaid && !bill.isRefunded && (
-          <Button
-            className="bg-red-600"
-            onClick={handleRefund}
-            disabled={actionLoading}
+        {/* TOP INFO */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <Card
+            variant="ghost"
+            hover={false}
+            className="p-4 border border-[#3b2a1a]/15 bg-transparent shadow-none"
           >
-            {actionLoading ? 'Refunding...' : 'Refund'}
-          </Button>
+            <p className="text-xs text-gray-500">Bill Number</p>
+            <p className="text-xl font-bold mt-1">#{bill.billNumber}</p>
+          </Card>
+
+          <Card
+            variant="ghost"
+            hover={false}
+            className="p-4 border border-[#3b2a1a]/15 bg-transparent shadow-none"
+          >
+            <p className="text-xs text-gray-500">Printed At</p>
+            <p className="text-sm font-medium mt-1">
+              {bill.printedAt ? new Date(bill.printedAt).toLocaleString() : '—'}
+            </p>
+          </Card>
+
+          <Card
+            variant="ghost"
+            hover={false}
+            className="p-4 border border-[#3b2a1a]/15 bg-transparent shadow-none"
+          >
+            <p className="text-xs text-gray-500">Customer</p>
+            <p className="text-sm font-medium mt-1">
+              {bill.customerPhone || '—'}
+            </p>
+          </Card>
+        </div>
+
+        {/* ITEMS + SUMMARY */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-[1.2fr_0.8fr]">
+          <Card
+            variant="ghost"
+            hover={false}
+            className="p-5 border border-[#3b2a1a]/15 bg-transparent shadow-none"
+          >
+            <h2 className="text-lg font-bold mb-4">Items</h2>
+
+            {bill.items?.length ? (
+              <div className="space-y-3">
+                {bill.items.map((i: any, index: number) => (
+                  <div
+                    key={index}
+                    className="flex items-start justify-between gap-3 border-b border-[#3b2a1a]/10 pb-3 last:border-b-0 last:pb-0"
+                  >
+                    <div>
+                      <p className="font-medium">
+                        {i.nameSnapshot} × {i.quantity}
+                      </p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        ₹{i.priceSnapshot} each
+                      </p>
+                    </div>
+
+                    <p className="font-semibold">
+                      ₹{i.priceSnapshot * i.quantity}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">No items found.</p>
+            )}
+          </Card>
+
+          <Card
+            variant="ghost"
+            hover={false}
+            className="p-5 border border-[#3b2a1a]/15 bg-transparent shadow-none"
+          >
+            <h2 className="text-lg font-bold mb-4">Summary</h2>
+
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Subtotal</span>
+                <span className="font-medium">₹{bill.subtotal || 0}</span>
+              </div>
+
+              <div className="flex justify-between text-red-700">
+                <span>Discount</span>
+                <span className="font-medium">- ₹{bill.discount || 0}</span>
+              </div>
+
+              <div className="flex justify-between text-red-700">
+                <span>Adjust Amount</span>
+                <span className="font-medium">- ₹{bill.adjustAmount || 0}</span>
+              </div>
+
+              <div className="flex justify-between">
+                <span className="text-gray-500">Tax</span>
+                <span className="font-medium">₹{bill.tax || 0}</span>
+              </div>
+
+              <div className="flex justify-between pt-3 border-t border-[#3b2a1a]/10 text-base font-bold">
+                <span>Total</span>
+                <span>₹{bill.totalAmount || 0}</span>
+              </div>
+
+              <div className="flex justify-between">
+                <span className="text-gray-500">Paid Amount</span>
+                <span className="font-medium">₹{bill.paidAmount || 0}</span>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* PAYMENTS */}
+        {bill.payments?.length > 0 && (
+          <Card
+            variant="ghost"
+            hover={false}
+            className="p-5 border border-[#3b2a1a]/15 bg-transparent shadow-none"
+          >
+            <h2 className="text-lg font-bold mb-4">Payments</h2>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              {bill.payments.map((p: any, index: number) => (
+                <Card
+                  key={index}
+                  variant="ghost"
+                  hover={false}
+                  className="p-4 border border-[#3b2a1a]/10 bg-transparent shadow-none"
+                >
+                  <p className="text-xs text-gray-500">Method</p>
+                  <p className="text-lg font-bold mt-1 uppercase">
+                    {String(p.method)}
+                  </p>
+
+                  <p className="text-xs text-gray-500 mt-3">Amount</p>
+                  <p className="text-lg font-semibold mt-1">₹{p.amount}</p>
+                </Card>
+              ))}
+            </div>
+          </Card>
         )}
+
+        {/* REFUND */}
+        {bill.isRefunded && (
+          <Card
+            variant="ghost"
+            hover={false}
+            className="p-5 border border-red-200 bg-transparent shadow-none"
+          >
+            <h2 className="text-lg font-bold text-red-700 mb-4">
+              Refund Details
+            </h2>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3 text-sm">
+              <div className="flex justify-between gap-3 md:block">
+                <span className="text-gray-500">Refund Amount</span>
+                <p className="font-medium mt-1">₹{bill.refundAmount || 0}</p>
+              </div>
+
+              <div className="flex justify-between gap-3 md:block">
+                <span className="text-gray-500">Refund Reason</span>
+                <p className="font-medium mt-1">{bill.refundReason || '—'}</p>
+              </div>
+
+              <div className="flex justify-between gap-3 md:block">
+                <span className="text-gray-500">Refunded At</span>
+                <p className="font-medium mt-1">
+                  {bill.refundAt
+                    ? new Date(bill.refundAt).toLocaleString()
+                    : '—'}
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* ACTIONS */}
+        <Card
+          variant="ghost"
+          hover={false}
+          className="p-4 border border-[#3b2a1a]/15 bg-transparent shadow-none"
+        >
+          <div className="flex flex-wrap gap-3">
+            <Button type="button" onClick={handlePrint}>
+              Reprint Bill
+            </Button>
+
+            {bill.shareUrl && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleOpenSharedBill}
+              >
+                View Shared Bill
+              </Button>
+            )}
+
+            {!bill.isPaid && !bill.isRefunded && (
+              <Button
+                type="button"
+                className="bg-green-600"
+                onClick={handlePayment}
+              >
+                Payment
+              </Button>
+            )}
+
+            {bill.isPaid && !bill.isRefunded && (
+              <Button
+                type="button"
+                className="bg-red-600"
+                onClick={handleRefund}
+                disabled={actionLoading}
+              >
+                {actionLoading ? 'Refunding...' : 'Refund'}
+              </Button>
+            )}
+          </div>
+        </Card>
       </div>
     </div>
   );

@@ -31,7 +31,9 @@ export async function GET(
         orderId: id,
         cancelled: false,
       })
-        .select('_id nameSnapshot priceSnapshot quantity kitchenStatus served')
+        .select(
+          '_id nameSnapshot priceSnapshot quantity kitchenStatus served cancelled wasted',
+        )
         .sort({ createdAt: 1 })
         .lean(),
     ]);

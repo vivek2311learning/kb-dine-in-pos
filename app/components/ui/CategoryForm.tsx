@@ -3,18 +3,14 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 
-interface CategoryData {
-  _id?: string;
-  name: string;
-  isActive?: boolean;
-}
-
 interface Props {
-  initialData?: CategoryData;
+  initialData?: {
+    _id: string;
+    name: string;
+  };
   isEdit?: boolean;
 }
 
@@ -24,11 +20,11 @@ export default function CategoryForm({ initialData, isEdit }: Props) {
   const [name, setName] = useState(initialData?.name || '');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async () => {
-    const trimmed = name.trim();
+  /* ---------------- SUBMIT ---------------- */
 
-    if (!trimmed) {
-      alert('Category name is required');
+  const handleSubmit = async () => {
+    if (!name.trim()) {
+      alert('Category name required');
       return;
     }
 
@@ -39,19 +35,19 @@ export default function CategoryForm({ initialData, isEdit }: Props) {
         ? `/api/admin/menu-categories/${initialData?._id}`
         : '/api/admin/menu-categories';
 
-      const method = isEdit ? 'PATCH' : 'POST';
-
       const res = await fetch(url, {
-        method,
+        method: isEdit ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ name: trimmed }),
+        body: JSON.stringify({
+          name: name.trim(),
+        }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.error || 'Failed to save category');
+        alert(data?.error || 'Failed to save category');
         return;
       }
 
@@ -59,45 +55,44 @@ export default function CategoryForm({ initialData, isEdit }: Props) {
       router.refresh();
     } catch (err) {
       console.error(err);
-      alert('Failed to save category');
+      alert('Something went wrong');
     } finally {
       setLoading(false);
     }
   };
 
+  /* ---------------- UI ---------------- */
+
   return (
-    <Card className="p-6 max-w-xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold">
-        {isEdit ? 'Edit Category' : 'Add Category'}
-      </h1>
+    <div className="space-y-6">
+      {/* BASIC INFO (same like MenuForm) */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">Basic Information</h2>
 
-      <Input
-        label="Category Name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="Enter category name"
-      />
+        <Input
+          label="Category Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+      </div>
 
-      <div className="flex gap-3">
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full"
-          onClick={() => router.push('/admin/menu/categories')}
-          disabled={loading}
-        >
-          Cancel
-        </Button>
+      {/* OPTIONAL FUTURE SECTION (keeps structure scalable) */}
+      {/* 
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">Settings</h2>
+      </div> 
+      */}
 
-        <Button
-          type="button"
-          className="w-full"
-          onClick={handleSubmit}
-          disabled={loading}
-        >
-          {loading ? 'Saving...' : isEdit ? 'Save Changes' : 'Add Category'}
+      {/* ACTION */}
+      <div className="pt-2">
+        <Button onClick={handleSubmit} disabled={loading} className="w-full">
+          {loading
+            ? 'Saving...'
+            : isEdit
+              ? 'Update Category'
+              : 'Create Category'}
         </Button>
       </div>
-    </Card>
+    </div>
   );
 }

@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 
@@ -41,11 +40,10 @@ export default function MenuForm({ initialData, isEdit }: Props) {
   const [loading, setLoading] = useState(false);
 
   const updateField = (field: keyof MenuItem, value: string | number) => {
-    setForm((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    setForm((prev) => ({ ...prev, [field]: value }));
   };
+
+  /* ---------------- LOAD CATEGORIES ---------------- */
 
   useEffect(() => {
     const loadCategories = async () => {
@@ -60,24 +58,17 @@ export default function MenuForm({ initialData, isEdit }: Props) {
         const data = await res.json();
 
         if (!res.ok) {
-          console.error(data);
           alert(data.error || 'Failed to load categories');
           return;
         }
 
-        const activeCategories = (data || []).filter(
-          (cat: MenuCategory) => cat.isActive,
-        );
+        const active = (data || []).filter((c: MenuCategory) => c.isActive);
 
-        setCategories(activeCategories);
+        setCategories(active);
 
         setForm((prev) => {
           if (prev.category) return prev;
-
-          return {
-            ...prev,
-            category: activeCategories[0]?.name || '',
-          };
+          return { ...prev, category: active[0]?.name || '' };
         });
       } catch (err) {
         console.error(err);
@@ -90,26 +81,13 @@ export default function MenuForm({ initialData, isEdit }: Props) {
     loadCategories();
   }, []);
 
+  /* ---------------- SUBMIT ---------------- */
+
   const handleSubmit = async () => {
-    if (!form.name.trim()) {
-      alert('Name is required');
-      return;
-    }
-
-    if (!form.description.trim()) {
-      alert('Description is required');
-      return;
-    }
-
-    if (!form.price || form.price <= 0) {
-      alert('Enter valid price');
-      return;
-    }
-
-    if (!form.category.trim()) {
-      alert('Category is required');
-      return;
-    }
+    if (!form.name.trim()) return alert('Name required');
+    if (!form.description.trim()) return alert('Description required');
+    if (!form.price || form.price <= 0) return alert('Invalid price');
+    if (!form.category.trim()) return alert('Category required');
 
     try {
       setLoading(true);
@@ -118,10 +96,8 @@ export default function MenuForm({ initialData, isEdit }: Props) {
         ? `/api/admin/menu/${initialData?._id}`
         : '/api/admin/menu';
 
-      const method = isEdit ? 'PATCH' : 'POST';
-
       const res = await fetch(url, {
-        method,
+        method: isEdit ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
@@ -134,8 +110,7 @@ export default function MenuForm({ initialData, isEdit }: Props) {
       const data = await res.json();
 
       if (!res.ok) {
-        console.error(data);
-        alert(data.error || 'Failed to save item');
+        alert(data.error || 'Failed to save');
         return;
       }
 
@@ -143,74 +118,91 @@ export default function MenuForm({ initialData, isEdit }: Props) {
       router.refresh();
     } catch (err) {
       console.error(err);
-      alert('Failed to save item');
+      alert('Failed to save');
     } finally {
       setLoading(false);
     }
   };
 
+  /* ---------------- UI ---------------- */
+
   return (
-    <Card className="p-6 max-w-xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold">
-        {isEdit ? 'Edit Menu Item' : 'Add Menu Item'}
-      </h1>
+    <div className="space-y-6">
+      {/* BASIC INFO */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">Basic Information</h2>
 
-      <Input
-        label="Name"
-        value={form.name}
-        onChange={(e) => updateField('name', e.target.value)}
-      />
+        <Input
+          label="Item Name"
+          value={form.name}
+          onChange={(e) => updateField('name', e.target.value)}
+        />
 
-      <textarea
-        className="w-full border rounded-lg px-4 py-2"
-        rows={3}
-        value={form.description}
-        onChange={(e) => updateField('description', e.target.value)}
-        placeholder="Description"
-      />
-
-      <Input
-        label="Price"
-        type="number"
-        value={form.price}
-        onChange={(e) => updateField('price', Number(e.target.value))}
-      />
-
-      <div className="space-y-1">
-        <label className="text-sm font-medium" htmlFor="category">
-          Category
-        </label>
-
-        <select
-          id="category"
-          className="w-full border rounded-lg px-4 py-2"
-          value={form.category}
-          onChange={(e) => updateField('category', e.target.value)}
-          disabled={categoriesLoading || loading || categories.length === 0}
-        >
-          {categories.length === 0 ? (
-            <option value="">
-              {categoriesLoading
-                ? 'Loading categories...'
-                : 'No categories available'}
-            </option>
-          ) : (
-            categories.map((category) => (
-              <option key={category._id} value={category.name}>
-                {category.name}
-              </option>
-            ))
-          )}
-        </select>
+        <div>
+          <label className="text-sm font-medium">Description</label>
+          <textarea
+            rows={3}
+            value={form.description}
+            onChange={(e) => updateField('description', e.target.value)}
+            className="mt-1 w-full rounded-xl border border-[#3b2a1a]/15 bg-transparent px-3 py-2.5 outline-none focus:ring-2 focus:ring-[#3b2a1a]/30"
+            placeholder="Short description..."
+          />
+        </div>
       </div>
 
-      <Button
-        onClick={handleSubmit}
-        className="w-full"
-        disabled={loading || categoriesLoading || categories.length === 0}
-      >
-        {loading ? 'Saving...' : 'Save Item'}
-      </Button>
-    </Card>
+      {/* PRICING */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">Pricing</h2>
+
+        <Input
+          label="Price (₹)"
+          type="number"
+          value={form.price}
+          onChange={(e) => updateField('price', Number(e.target.value))}
+        />
+      </div>
+
+      {/* CATEGORY */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">Category</h2>
+
+        <div className="space-y-1">
+          <label htmlFor="category" className="text-sm font-medium">
+            Category
+          </label>
+
+          <select
+            id="category" // ✅ IMPORTANT
+            className="w-full rounded-xl border border-[#3b2a1a]/15 bg-transparent px-3 py-2.5 outline-none focus:ring-2 focus:ring-[#3b2a1a]/30"
+            value={form.category}
+            onChange={(e) => updateField('category', e.target.value)}
+            disabled={categoriesLoading || loading}
+          >
+            {categories.length === 0 ? (
+              <option>
+                {categoriesLoading ? 'Loading...' : 'No categories available'}
+              </option>
+            ) : (
+              categories.map((c) => (
+                <option key={c._id} value={c.name}>
+                  {c.name}
+                </option>
+              ))
+            )}
+          </select>
+        </div>
+      </div>
+
+      {/* ACTION */}
+      <div className="pt-4">
+        <Button
+          onClick={handleSubmit}
+          disabled={loading || categoriesLoading}
+          className="w-full"
+        >
+          {loading ? 'Saving...' : isEdit ? 'Update Item' : 'Create Item'}
+        </Button>
+      </div>
+    </div>
   );
 }

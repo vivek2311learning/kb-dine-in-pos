@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   useCallback,
+  ReactNode,
 } from 'react';
 
 import { Notification } from './notification';
@@ -16,33 +17,49 @@ import { NotificationInfo } from './notification-info';
 
 type NotificationType = 'success' | 'error' | 'warning' | 'info';
 
+interface NotificationAction {
+  label: string;
+  onClick: () => void;
+}
+
+interface ShowOptions {
+  type: NotificationType;
+  message: string;
+  title?: string;
+  duration?: number;
+  action?: NotificationAction;
+}
+
 interface NotificationState {
   id: number;
   type: NotificationType;
   title?: string;
   message: string;
+  duration: number;
+  action?: NotificationAction;
 }
 
 interface NotificationContextType {
-  show: (type: NotificationType, message: string, title?: string) => void;
+  show: (options: ShowOptions) => void;
+  success: (message: string, title?: string) => void;
+  error: (message: string, title?: string) => void;
+  warning: (message: string, title?: string) => void;
+  info: (message: string, title?: string) => void;
+  dismiss: (id: number) => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | null>(null);
 
-export function NotificationProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<NotificationState[]>([]);
   const idRef = useRef(0);
 
-  const remove = (id: number) => {
+  const dismiss = useCallback((id: number) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
-  };
+  }, []);
 
   const show = useCallback(
-    (type: NotificationType, message: string, title?: string) => {
+    ({ type, message, title, duration = 4000, action }: ShowOptions) => {
       const id = ++idRef.current;
 
       setNotifications((prev) => [
@@ -50,21 +67,53 @@ export function NotificationProvider({
         {
           id,
           type,
-          message,
           title,
+          message,
+          duration,
+          action,
         },
       ]);
 
-      setTimeout(() => {
-        remove(id);
-      }, 5000);
+      window.setTimeout(() => {
+        dismiss(id);
+      }, duration);
     },
-    [],
+    [dismiss],
+  );
+
+  const success = useCallback(
+    (message: string, title = 'Success') => {
+      show({ type: 'success', message, title });
+    },
+    [show],
+  );
+
+  const error = useCallback(
+    (message: string, title = 'Error') => {
+      show({ type: 'error', message, title, duration: 5000 });
+    },
+    [show],
+  );
+
+  const warning = useCallback(
+    (message: string, title = 'Warning') => {
+      show({ type: 'warning', message, title });
+    },
+    [show],
+  );
+
+  const info = useCallback(
+    (message: string, title = 'Info') => {
+      show({ type: 'info', message, title });
+    },
+    [show],
   );
 
   const renderNotification = (notification: NotificationState) => {
     const props = {
       title: notification.title,
+      onClose: () => dismiss(notification.id),
+      action: notification.action,
       children: notification.message,
     };
 
@@ -83,12 +132,23 @@ export function NotificationProvider({
   };
 
   return (
-    <NotificationContext.Provider value={{ show }}>
+    <NotificationContext.Provider
+      value={{
+        show,
+        success,
+        error,
+        warning,
+        info,
+        dismiss,
+      }}
+    >
       {children}
 
-      <div className="fixed top-6 right-6 z-50 space-y-3">
+      <div className="fixed top-4 right-4 left-4 sm:left-auto sm:top-6 sm:right-6 z-[100] space-y-3 pointer-events-none">
         {notifications.map((notification) => (
-          <div key={notification.id}>{renderNotification(notification)}</div>
+          <div key={notification.id} className="pointer-events-auto">
+            {renderNotification(notification)}
+          </div>
         ))}
       </div>
     </NotificationContext.Provider>

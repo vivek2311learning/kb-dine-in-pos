@@ -26,7 +26,7 @@ export function AdminNavbar() {
 
   useEffect(() => {
     if (params.get('flash') === 'login') {
-      show('success', 'Welcome back!');
+      show({ type: 'success', message: 'Welcome back!' });
       router.replace('/admin/dashboard');
     }
   }, [params, router, show]);
@@ -46,7 +46,7 @@ export function AdminNavbar() {
       router.replace('/');
       router.refresh();
     } catch {
-      show('error', 'Logout failed');
+      show({ type: 'error', message: 'Logout failed' });
     }
   };
 

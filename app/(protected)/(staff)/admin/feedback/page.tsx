@@ -11,6 +11,9 @@ interface Feedback {
   comment?: string;
   createdAt: string;
   orderId?: {
+    _id?: string;
+    type?: 'dine-in' | 'parcel';
+    parcelNumber?: number;
     tableId?: {
       tableNumber: number;
     };
@@ -28,14 +31,17 @@ export default function AdminFeedbackPage() {
     try {
       const res = await fetch(
         `/api/admin/feedback${filter ? `?rating=${filter}` : ''}`,
-        { cache: 'no-store' },
+        {
+          cache: 'no-store',
+          credentials: 'include',
+        },
       );
 
       const data = await res.json();
-
-      setFeedbacks(data);
+      setFeedbacks(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
+      setFeedbacks([]);
     } finally {
       setLoading(false);
     }
@@ -46,70 +52,131 @@ export default function AdminFeedbackPage() {
     fetchFeedbacks();
   }, [filter]);
 
-  const ratingColor = (rating: number) => {
-    if (rating >= 4) return 'bg-green-100 text-green-700';
+  const getRatingTone = (rating: number) => {
+    if (rating >= 4) {
+      return 'border-green-200 text-green-700 bg-green-50/60';
+    }
 
-    if (rating === 3) return 'bg-yellow-100 text-yellow-700';
+    if (rating === 3) {
+      return 'border-yellow-200 text-yellow-700 bg-yellow-50/60';
+    }
 
-    return 'bg-red-100 text-red-700';
+    return 'border-red-200 text-red-700 bg-red-50/60';
+  };
+
+  const getOrderLabel = (feedback: Feedback) => {
+    if (feedback.orderId?.type === 'parcel') {
+      return `Parcel #${feedback.orderId?.parcelNumber || '-'}`;
+    }
+
+    return `Table ${feedback.orderId?.tableId?.tableNumber || '-'}`;
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
-      <h1 className="text-3xl font-bold">Customer Feedback</h1>
+    <div className="px-3 py-4 sm:px-4 md:px-6 md:py-6">
+      <div className="mx-auto max-w-6xl space-y-6">
+        {/* HEADER */}
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">Customer Feedback</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Review customer ratings, comments, and order-linked feedback.
+          </p>
+        </div>
 
-      <div className="flex gap-3 items-center">
-        <span className="text-sm font-medium">Filter</span>
-        <label htmlFor="rating">Rating</label>
-        <select
-          value={filter}
-          id="rating"
-          onChange={(e) => setFilter(e.target.value)}
-          className="border rounded p-2"
+        {/* FILTER */}
+        <Card
+          variant="ghost"
+          hover={false}
+          className="p-4 border border-[#3b2a1a]/15 bg-transparent shadow-none"
         >
-          <option value="">All</option>
-          <option value="5">5 ⭐</option>
-          <option value="4">4 ⭐</option>
-          <option value="3">3 ⭐</option>
-          <option value="2">2 ⭐</option>
-          <option value="1">1 ⭐</option>
-        </select>
-      </div>
-
-      {loading && <p className="text-gray-500">Loading feedback...</p>}
-
-      {!loading && feedbacks.length === 0 && (
-        <p className="text-red-500">No feedback found</p>
-      )}
-
-      <div className="space-y-3">
-        {feedbacks.map((f) => (
-          <Card
-            key={f._id}
-            onClick={() => router.push(`/admin/feedback/${f._id}`)}
-            className="p-4 cursor-pointer hover:shadow-md transition"
-          >
-            <div className="flex justify-between items-center">
-              <span
-                className={`px-2 py-1 rounded text-sm ${ratingColor(f.rating)}`}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[160px_1fr] md:items-end">
+            <div>
+              <label
+                htmlFor="rating"
+                className="block text-sm font-medium mb-2"
               >
-                <StarRating rating={f.rating} />
-              </span>
+                Rating Filter
+              </label>
 
-              <span className="text-sm ">
-                Table {f.orderId?.tableId?.tableNumber || '-'}
-              </span>
+              <select
+                value={filter}
+                id="rating"
+                onChange={(e) => setFilter(e.target.value)}
+                className="w-full rounded-xl border border-[#3b2a1a]/15 bg-transparent px-3 py-2.5 outline-none"
+              >
+                <option value="">All Ratings</option>
+                <option value="5">5 Star</option>
+                <option value="4">4 Star</option>
+                <option value="3">3 Star</option>
+                <option value="2">2 Star</option>
+                <option value="1">1 Star</option>
+              </select>
             </div>
 
-            <p className="text-sm  mt-2 line-clamp-2">
-              {f.comment || 'No comment'}
-            </p>
+            <div className="text-sm text-gray-500">
+              {filter
+                ? `Showing feedback with rating ${filter} star`
+                : 'Showing all customer feedback'}
+            </div>
+          </div>
+        </Card>
 
-            <p className="text-xs  mt-2">
-              {new Date(f.createdAt).toLocaleString()}
-            </p>
+        {/* LIST */}
+        {loading ? (
+          <Card
+            variant="ghost"
+            hover={false}
+            className="p-8 text-center border border-[#3b2a1a]/15 bg-transparent shadow-none"
+          >
+            <p className="text-gray-500">Loading feedback...</p>
           </Card>
-        ))}
+        ) : feedbacks.length === 0 ? (
+          <Card
+            variant="ghost"
+            hover={false}
+            className="p-8 text-center border border-[#3b2a1a]/15 bg-transparent shadow-none"
+          >
+            <p className="text-gray-500">No feedback found.</p>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {feedbacks.map((f) => (
+              <Card
+                key={f._id}
+                onClick={() => router.push(`/admin/feedback/${f._id}`)}
+                variant="ghost"
+                hover={false}
+                className="p-5 border border-[#3b2a1a]/15 bg-transparent shadow-none cursor-pointer transition hover:-translate-y-1 hover:shadow-lg"
+              >
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div
+                      className={`inline-flex rounded-lg border px-3 py-1.5 ${getRatingTone(
+                        f.rating,
+                      )}`}
+                    >
+                      <StarRating rating={f.rating} />
+                    </div>
+
+                    <div className="text-right">
+                      <p className="text-sm font-medium">{getOrderLabel(f)}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {new Date(f.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-gray-500 mb-1">Comment</p>
+                    <p className="text-sm leading-6 line-clamp-3">
+                      {f.comment?.trim() || 'No comment provided.'}
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

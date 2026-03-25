@@ -1,5 +1,5 @@
-import { Notification } from './notification';
 import { HTMLAttributes } from 'react';
+import { Notification } from './notification';
 
 interface NotificationErrorProps extends HTMLAttributes<HTMLDivElement> {
   title?: string;

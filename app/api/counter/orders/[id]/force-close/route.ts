@@ -12,8 +12,6 @@ export async function PATCH(
   req: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const session = await mongoose.startSession();
-
   try {
     await requireRole(['counter', 'admin']);
     await connectDB();
@@ -24,33 +22,33 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid order id' }, { status: 400 });
     }
 
-    session.startTransaction();
-
-    const order = await Order.findById(id).session(session);
+    const order = await Order.findById(id).select('_id tableId status').lean();
 
     if (!order) {
-      throw new Error('Order not found');
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
     if (order.status === 'closed') {
-      throw new Error('Order already closed');
+      return NextResponse.json(
+        { error: 'Order already closed' },
+        { status: 400 },
+      );
     }
 
-    /* ready items = waste */
     const readyItemsExist = await OrderItem.exists({
       orderId: id,
       cancelled: false,
+      served: false,
       wasted: false,
       kitchenStatus: 'ready',
     });
 
-    /* non-ready active items = cancelled */
     await OrderItem.updateMany(
       {
         orderId: id,
         cancelled: false,
         served: false,
-        kitchenStatus: { $ne: 'ready' },
+        kitchenStatus: { $in: ['draft', 'pending', 'confirmed', 'preparing'] },
       },
       {
         $set: {
@@ -61,10 +59,8 @@ export async function PATCH(
           cancelStage: 'force_close',
         },
       },
-      { session },
     );
 
-    /* ready items = wasted */
     await OrderItem.updateMany(
       {
         orderId: id,
@@ -79,14 +75,18 @@ export async function PATCH(
           billable: false,
         },
       },
-      { session },
     );
 
-    order.status = 'closed';
-    order.closedReason = 'force_closed';
-    order.closedAt = new Date();
-
-    await order.save({ session });
+    await Order.updateOne(
+      { _id: id },
+      {
+        $set: {
+          status: 'closed',
+          closedReason: 'force_closed',
+          closedAt: new Date(),
+        },
+      },
+    );
 
     if (order.tableId) {
       await Table.updateOne(
@@ -100,11 +100,8 @@ export async function PATCH(
             currentOrderId: null,
           },
         },
-        { session },
       );
     }
-
-    await session.commitTransaction();
 
     return NextResponse.json({
       success: true,
@@ -112,15 +109,11 @@ export async function PATCH(
       hasWaste: !!readyItemsExist,
     });
   } catch (err: any) {
-    await session.abortTransaction();
-
     console.error('Force Close Error:', err);
 
     return NextResponse.json(
       { error: err.message || 'Failed to force close order' },
       { status: 400 },
     );
-  } finally {
-    await session.endSession();
   }
 }

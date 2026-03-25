@@ -41,15 +41,27 @@ function LoginForm() {
     if (!flash && !unauthorized && !expired) return;
 
     if (flash === 'logout') {
-      show('success', 'Logged out successfully');
+      show({
+        type: 'success',
+        message: 'Logged out successfully',
+        title: 'Success',
+      });
     }
 
     if (unauthorized) {
-      show('error', 'Access denied. Please login.');
+      show({
+        type: 'error',
+        message: 'Access denied. Please login.',
+        title: 'Error',
+      });
     }
 
     if (expired) {
-      show('error', 'Session expired. Please login again.');
+      show({
+        type: 'error',
+        message: 'Session expired. Please login again.',
+        title: 'Error',
+      });
     }
 
     router.replace('/login');
@@ -95,7 +107,7 @@ function LoginForm() {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Login failed';
 
-      show('error', message, 'Login Failed');
+      show({ type: 'error', message: 'Login Failed', title: 'Error' });
       setError(message);
     } finally {
       setLoading(false);

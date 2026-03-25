@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 
@@ -30,9 +29,9 @@ export default function StaffForm({ initialData, isEdit = false }: Props) {
   const [role, setRole] = useState<Role>(initialData?.role || 'counter');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  /* ---------------- SUBMIT ---------------- */
 
+  const handleSubmit = async () => {
     const trimmedName = name.trim();
     const trimmedEmail = email.trim();
 
@@ -76,9 +75,7 @@ export default function StaffForm({ initialData, isEdit = false }: Props) {
 
       const res = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(body),
       });
@@ -93,24 +90,24 @@ export default function StaffForm({ initialData, isEdit = false }: Props) {
       router.push('/admin/staff');
       router.refresh();
     } catch (error) {
-      console.error('Staff save failed', error);
+      console.error(error);
       alert('Failed to save staff');
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <Card className="max-w-md mx-auto p-6 space-y-6">
-      <h1 className="text-2xl font-bold">
-        {isEdit ? 'Edit Staff Member' : 'Create Staff Member'}
-      </h1>
+  /* ---------------- UI ---------------- */
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+  return (
+    <div className="space-y-6">
+      {/* BASIC INFO */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">Basic Information</h2>
+
         <Input
           label="Name"
           value={name}
-          placeholder="Staff name"
           onChange={(e) => setName(e.target.value)}
         />
 
@@ -119,41 +116,48 @@ export default function StaffForm({ initialData, isEdit = false }: Props) {
             label="Email"
             type="email"
             value={email}
-            placeholder="email@example.com"
             onChange={(e) => setEmail(e.target.value)}
           />
         )}
+      </div>
+
+      {/* SECURITY */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">Security</h2>
 
         <Input
           label="Password"
           type="password"
           value={password}
           placeholder={isEdit ? 'Leave empty to keep current password' : ''}
-          required={!isEdit}
           onChange={(e) => setPassword(e.target.value)}
         />
+      </div>
 
-        <div className="space-y-1">
-          <label className="text-sm font-medium" htmlFor="role">
-            Role
-          </label>
+      {/* ROLE */}
+      <div className="space-y-2">
+        <label htmlFor="role" className="text-sm font-medium text-gray-700">
+          Role
+        </label>
 
-          <select
-            id="role"
-            value={role}
-            onChange={(e) => setRole(e.target.value as Role)}
-            className="w-full border rounded-lg px-4 py-2"
-          >
-            <option value="admin">Admin</option>
-            <option value="counter">Counter</option>
-            <option value="kitchen">Kitchen</option>
-          </select>
-        </div>
+        <select
+          id="role"
+          value={role}
+          onChange={(e) => setRole(e.target.value as Role)}
+          className="w-full rounded-xl border border-[#3b2a1a]/15 bg-transparent px-3 py-2.5 outline-none focus:ring-2 focus:ring-[#3b2a1a]/30"
+        >
+          <option value="admin">Admin</option>
+          <option value="counter">Counter</option>
+          <option value="kitchen">Kitchen</option>
+        </select>
+      </div>
 
-        <Button type="submit" disabled={loading} className="w-full">
+      {/* ACTION */}
+      <div className="pt-2">
+        <Button onClick={handleSubmit} disabled={loading} className="w-full">
           {loading ? 'Saving...' : isEdit ? 'Update Staff' : 'Create Staff'}
         </Button>
-      </form>
-    </Card>
+      </div>
+    </div>
   );
 }

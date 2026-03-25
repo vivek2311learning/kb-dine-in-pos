@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+
 import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 
@@ -22,17 +23,11 @@ export default function AdminStaffPage() {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
 
-  /* ================= FETCH (ONCE) ================= */
-
   useEffect(() => {
     const fetchStaff = async () => {
       try {
-        const res = await fetch('/api/admin/staff', {
-          cache: 'no-store',
-        });
-
+        const res = await fetch('/api/admin/staff', { cache: 'no-store' });
         const data = await res.json();
-
         setStaff(data || []);
       } catch (err) {
         console.error(err);
@@ -44,20 +39,11 @@ export default function AdminStaffPage() {
     fetchStaff();
   }, []);
 
-  /* ================= OPTIMISTIC UPDATE ================= */
-
   const updateStatus = async (id: string, active: boolean) => {
-    const confirmAction = window.confirm(
-      active ? 'Activate this staff member?' : 'Deactivate this staff member?',
-    );
+    if (!confirm(active ? 'Activate staff?' : 'Deactivate staff?')) return;
 
-    if (!confirmAction) return;
-
-    /* ⚡ instant UI update */
     setStaff((prev) =>
-      prev.map((s) =>
-        s._id === id ? { ...s, isActive: active } : s
-      )
+      prev.map((s) => (s._id === id ? { ...s, isActive: active } : s)),
     );
 
     try {
@@ -66,124 +52,105 @@ export default function AdminStaffPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isActive: active }),
       });
-    } catch (err) {
-      console.error(err);
-
-      /* ❌ rollback if failed */
+    } catch {
       setStaff((prev) =>
-        prev.map((s) =>
-          s._id === id ? { ...s, isActive: !active } : s
-        )
+        prev.map((s) => (s._id === id ? { ...s, isActive: !active } : s)),
       );
     }
   };
-
-  /* ================= FILTER (MEMO) ================= */
 
   const filtered = useMemo(() => {
     return staff.filter(
       (s) =>
         (!roleFilter || s.role === roleFilter) &&
-        s.name.toLowerCase().includes(search.toLowerCase())
+        s.name.toLowerCase().includes(search.toLowerCase()),
     );
   }, [staff, search, roleFilter]);
-
-  /* ================= ROLE COLOR ================= */
 
   const roleColor = (role: string) => {
     if (role === 'admin') return 'bg-purple-100 text-purple-700';
     if (role === 'counter') return 'bg-blue-100 text-blue-700';
     if (role === 'kitchen') return 'bg-yellow-100 text-yellow-700';
-
     return 'bg-gray-100 text-gray-600';
   };
-
-  /* ================= UI ================= */
 
   if (loading) {
     return <div className="p-6 text-gray-500">Loading staff...</div>;
   }
 
   return (
-    <div className="p-4 md:p-8 space-y-6 max-w-5xl mx-auto">
+    <div className="px-4 py-6 md:px-6 md:py-8 max-w-5xl mx-auto space-y-6">
       {/* HEADER */}
-
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-        <h1 className="text-2xl md:text-3xl font-bold">
-          Staff Management
-        </h1>
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">Staff Management</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Manage staff accounts and roles
+          </p>
+        </div>
 
         <Button onClick={() => router.push('/admin/staff/new')}>
           + Add Staff
         </Button>
       </div>
 
-      {/* SEARCH + FILTER */}
+      {/* FILTER BAR */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        {/* SEARCH */}
+        <div className="w-full sm:w-72">
+          <label htmlFor="staff-search" className="sr-only">
+            Search staff
+          </label>
 
-      <div className="flex flex-col md:flex-row gap-3">
+          <input
+            id="staff-search"
+            type="text"
+            placeholder="Search staff..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-xl border border-[#3b2a1a]/15 px-3 py-2.5"
+          />
+        </div>
 
-  {/* SEARCH */}
-  <div>
-    <label htmlFor="staff-search" className="sr-only">
-      Search staff
-    </label>
-    <input
-      id="staff-search"
-      type="text"
-      placeholder="🔍 Search staff..."
-      value={search}
-      onChange={(e) => setSearch(e.target.value)}
-      className="border rounded-lg px-4 py-2 text-sm w-full md:w-72"
-    />
-  </div>
+        {/* ROLE FILTER */}
+        <div className="w-full sm:w-48">
+          <label htmlFor="role-filter" className="sr-only">
+            Filter by role
+          </label>
 
-  {/* ROLE FILTER */}
-  <div>
-    <label htmlFor="role-filter" className="sr-only">
-      Filter by role
-    </label>
-    <select
-      id="role-filter"
-      value={roleFilter}
-      onChange={(e) => setRoleFilter(e.target.value)}
-      className="border rounded-lg px-3 py-2 text-sm w-full md:w-40"
-    >
-      <option value="">All Roles</option>
-      <option value="admin">Admin</option>
-      <option value="counter">Counter</option>
-      <option value="kitchen">Kitchen</option>
-    </select>
-  </div>
-
-</div>
+          <select
+            id="role-filter"
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+            className="w-full rounded-xl border border-[#3b2a1a]/15 px-3 py-2.5"
+          >
+            <option value="">All Roles</option>
+            <option value="admin">Admin</option>
+            <option value="counter">Counter</option>
+            <option value="kitchen">Kitchen</option>
+          </select>
+        </div>
+      </div>
 
       {/* COUNT */}
-
-      <p className="text-sm text-gray-500">
-        {filtered.length} staff members
-      </p>
-
-      {/* EMPTY */}
-
-      {filtered.length === 0 && (
-        <p className="text-gray-500">No staff members found</p>
-      )}
+      <p className="text-sm text-gray-500">{filtered.length} staff members</p>
 
       {/* LIST */}
-
       <div className="space-y-4">
         {filtered.map((user) => (
-          <Card key={user._id} className="p-4">
+          <Card
+            variant="ghost"
+            hover={false}
+            key={user._id}
+            className="p-4 border border-[#3b2a1a]/15 bg-transparent shadow-none"
+          >
             <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-
               {/* INFO */}
+              <div>
+                <p className="font-semibold text-lg">{user.name}</p>
+                <p className="text-sm text-gray-500">{user.email}</p>
 
-              <div className="space-y-1">
-                <p className="font-semibold">{user.name}</p>
-
-                <p className="text-sm">{user.email}</p>
-
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex gap-2 mt-2 flex-wrap">
                   <span
                     className={`text-xs px-2 py-1 rounded ${roleColor(user.role)}`}
                   >
@@ -202,38 +169,31 @@ export default function AdminStaffPage() {
                 </div>
               </div>
 
-              {/* ACTIONS */}
-
-              <div className="flex flex-wrap gap-2">
+              {/* ACTION */}
+              <div className="flex gap-2 flex-wrap">
                 <Button
-                  onClick={() =>
-                    router.push(`/admin/staff/${user._id}/edit`)
-                  }
+                  variant="outline"
+                  onClick={() => router.push(`/admin/staff/${user._id}/edit`)}
                 >
                   Edit
                 </Button>
 
                 {user.isActive ? (
                   <Button
-                    className="bg-red-600 text-white"
-                    onClick={() =>
-                      updateStatus(user._id, false)
-                    }
+                    className="bg-red-600"
+                    onClick={() => updateStatus(user._id, false)}
                   >
                     Deactivate
                   </Button>
                 ) : (
                   <Button
-                    className="bg-green-600 text-white"
-                    onClick={() =>
-                      updateStatus(user._id, true)
-                    }
+                    className="bg-green-600"
+                    onClick={() => updateStatus(user._id, true)}
                   >
                     Activate
                   </Button>
                 )}
               </div>
-
             </div>
           </Card>
         ))}

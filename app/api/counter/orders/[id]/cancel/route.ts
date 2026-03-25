@@ -12,8 +12,6 @@ export async function PATCH(
   req: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const session = await mongoose.startSession();
-
   try {
     await requireRole(['counter', 'admin']);
     await connectDB();
@@ -24,49 +22,129 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid order id' }, { status: 400 });
     }
 
-    session.startTransaction();
-
-    const order = await Order.findById(id).session(session);
+    const order = await Order.findById(id)
+      .select('_id type tableId status')
+      .lean();
 
     if (!order) {
-      throw new Error('Order not found');
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
     if (order.status === 'closed') {
-      throw new Error('Order already closed');
-    }
-
-    /* ❌ block if any item has entered kitchen process or is already served */
-    const blocked = await OrderItem.exists({
-      orderId: id,
-      cancelled: false,
-      $or: [
-        { served: true },
-        { kitchenStatus: { $in: ['pending', 'preparing', 'ready'] } },
-      ],
-    });
-
-    if (blocked) {
-      throw new Error(
-        'Cannot cancel. Some items are already in kitchen process.',
+      return NextResponse.json(
+        { error: 'Order already closed' },
+        { status: 400 },
       );
     }
 
-    await OrderItem.updateMany(
-      { orderId: id, cancelled: false },
+    const items = await OrderItem.find(
       {
-        cancelled: true,
-        billable: false,
-        wasted: false,
+        orderId: id,
+        cancelled: false,
       },
-      { session },
+      'served wasted kitchenStatus',
+    ).lean();
+
+    const hasKitchenProgress = items.some(
+      (item: any) =>
+        !item.wasted &&
+        (item.served === true ||
+          ['pending', 'confirmed', 'preparing', 'ready'].includes(
+            item.kitchenStatus,
+          )),
     );
 
-    order.status = 'closed';
-    order.closedReason = 'cancelled';
-    order.closedAt = new Date();
+    if (!hasKitchenProgress) {
+      await OrderItem.updateMany(
+        { orderId: id, cancelled: false },
+        {
+          $set: {
+            cancelled: true,
+            billable: false,
+            wasted: false,
+            cancelledAt: new Date(),
+            cancelStage: 'cancelled',
+          },
+        },
+      );
 
-    await order.save({ session });
+      await Order.updateOne(
+        { _id: id },
+        {
+          $set: {
+            status: 'closed',
+            closedReason: 'cancelled',
+            closedAt: new Date(),
+          },
+        },
+      );
+
+      if (order.tableId) {
+        await Table.updateOne(
+          {
+            _id: order.tableId,
+            currentOrderId: order._id,
+          },
+          {
+            $set: {
+              status: 'free',
+              currentOrderId: null,
+            },
+          },
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        orderId: id,
+        type: 'cancelled',
+      });
+    }
+
+    await OrderItem.updateMany(
+      {
+        orderId: id,
+        cancelled: false,
+        served: false,
+        kitchenStatus: { $in: ['draft', 'pending', 'confirmed', 'preparing'] },
+      },
+      {
+        $set: {
+          cancelled: true,
+          billable: false,
+          wasted: false,
+          cancelledAt: new Date(),
+          cancelStage: 'force_close',
+        },
+      },
+    );
+
+    await OrderItem.updateMany(
+      {
+        orderId: id,
+        cancelled: false,
+        served: false,
+        wasted: false,
+        kitchenStatus: 'ready',
+      },
+      {
+        $set: {
+          wasted: true,
+          billable: false,
+        },
+      },
+    );
+
+    await Order.updateOne(
+      { _id: id },
+      {
+        $set: {
+          status: 'closed',
+          closedReason: 'force_closed',
+          closedAt: new Date(),
+        },
+      },
+    );
 
     if (order.tableId) {
       await Table.updateOne(
@@ -75,30 +153,25 @@ export async function PATCH(
           currentOrderId: order._id,
         },
         {
-          status: 'free',
-          currentOrderId: null,
+          $set: {
+            status: 'free',
+            currentOrderId: null,
+          },
         },
-        { session },
       );
     }
-
-    await session.commitTransaction();
 
     return NextResponse.json({
       success: true,
       orderId: id,
-      type: 'cancelled',
+      type: 'force_closed',
     });
   } catch (err: any) {
-    await session.abortTransaction();
-
     console.error('Cancel Order Error:', err);
 
     return NextResponse.json(
       { error: err.message || 'Cancel failed' },
       { status: 400 },
     );
-  } finally {
-    await session.endSession();
   }
 }

@@ -1,41 +1,66 @@
-export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic';
 
-import { NextResponse } from 'next/server'
-import { connectDB } from '@/app/lib/db'
-import OrderItem from '@/app/lib/models/orderItem'
-import { requireRole } from '@/app/lib/auth/requireRole'
+import { NextResponse } from 'next/server';
+import { connectDB } from '@/app/lib/db';
+import OrderItem from '@/app/lib/models/orderItem';
+import { requireRole } from '@/app/lib/auth/requireRole';
 
-export async function GET(){
+export async function GET() {
+  try {
+    await requireRole(['counter', 'admin']);
+    await connectDB();
 
-try{
+    const readyParcels = await OrderItem.aggregate([
+      {
+        $match: {
+          kitchenStatus: 'ready',
+          served: false,
+          cancelled: false,
+          wasted: false,
+        },
+      },
+      {
+        $group: {
+          _id: '$orderId',
+        },
+      },
+      {
+        $lookup: {
+          from: 'orders',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'order',
+        },
+      },
+      {
+        $unwind: '$order',
+      },
+      {
+        $match: {
+          'order.type': 'parcel',
+          'order.status': 'running',
+        },
+      },
+      {
+        $project: {
+          _id: '$order._id',
+          parcelNumber: '$order.parcelNumber',
+        },
+      },
+      {
+        $sort: {
+          parcelNumber: 1,
+        },
+      },
+    ]);
 
-await requireRole(['counter','admin'])
+    return NextResponse.json(readyParcels);
+  } catch (err) {
+    console.error('Ready Parcel Fetch Error:', err);
 
-await connectDB()
-
-const readyOrders = await OrderItem.aggregate([
-{
-$match:{
-kitchenStatus:'ready',
-served:false,
-cancelled:false
-}
-},
-{
-$group:{
-_id:'$orderId'
-}
-}
-])
-
-return NextResponse.json(readyOrders)
-
-}catch(err){
-
-console.error(err)
-
-return NextResponse.json({error:'failed'},{status:500})
-
-}
-
+    return NextResponse.json(
+      { error: 'Failed to fetch ready parcels' },
+      { status: 500 },
+    );
+  }
 }

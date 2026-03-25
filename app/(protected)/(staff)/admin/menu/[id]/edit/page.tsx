@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import MenuForm from '@/app/components/ui/MenuForm';
 import { connectDB } from '@/app/lib/db';
 import MenuItem from '@/app/lib/models/MenuItem';
+import { Card } from '@/app/components/ui/card';
 
 export default async function EditMenuPage({
   params,
@@ -14,13 +15,15 @@ export default async function EditMenuPage({
   const { id } = await params;
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return <div className="p-6">Invalid menu item id</div>;
+    return (
+      <div className="p-6 text-center text-red-600">Invalid menu item id</div>
+    );
   }
 
   const item = await MenuItem.findById(id).lean();
 
   if (!item) {
-    return <div className="p-6">Item not found</div>;
+    return <div className="p-6 text-center text-red-600">Item not found</div>;
   }
 
   const safeItem = {
@@ -32,15 +35,25 @@ export default async function EditMenuPage({
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-3xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold">Edit Menu Item</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Edit item for the restaurant menu
-        </p>
-      </div>
+    <div className="px-3 py-4 sm:px-4 md:px-6 md:py-6">
+      <div className="mx-auto max-w-3xl space-y-6">
+        {/* HEADER */}
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">Edit Menu Item</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Update details of this menu item
+          </p>
+        </div>
 
-      <MenuForm initialData={safeItem} isEdit />
+        {/* FORM CARD */}
+        <Card
+          variant="ghost"
+          hover={false}
+          className="p-5 md:p-6 border border-[#3b2a1a]/15 bg-transparent shadow-none"
+        >
+          <MenuForm initialData={safeItem} isEdit />
+        </Card>
+      </div>
     </div>
   );
 }

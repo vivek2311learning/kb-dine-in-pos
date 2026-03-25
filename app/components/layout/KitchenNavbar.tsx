@@ -21,7 +21,7 @@ export function KitchenNavbar() {
 
   useEffect(() => {
     if (params.get('flash') === 'login') {
-      show('success', 'Welcome back!');
+      show({ type: 'success', message: 'Welcome back!' });
       router.replace('/kitchen/orders');
     }
   }, [params, router, show]);
@@ -34,19 +34,19 @@ export function KitchenNavbar() {
 
   /* LOGOUT */
 
- const handleLogout = async () => {
-  try {
-    await fetch('/api/auth/logout', {
-      method: 'POST',
-      credentials: 'include', // 🔥 MUST
-    });
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include', // 🔥 MUST
+      });
 
-    router.replace('/');
-    router.refresh();
-  } catch {
-    show('error', 'Logout failed');
-  }
-};
+      router.replace('/');
+      router.refresh();
+    } catch {
+      show({ type: 'error', message: 'Logout failed' });
+    }
+  };
 
   return (
     <header className="w-full shadow-sm bg-white/20 backdrop-blur-md border-b border-[#3b2a1a]/20">

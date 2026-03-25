@@ -1,23 +1,63 @@
 'use client';
 
 import { Button } from '@/app/components/ui/button';
+import { Card } from '@/app/components/ui/card';
+import { Badge } from '@/app/components/ui/badge';
+import { useNotification } from '@/app/components/notification';
 import { useParams, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 export default function FeedbackPage() {
   const params = useParams();
   const router = useRouter();
+  const notification = useNotification();
 
-  const tableId = params.tableId as string;
   const orderId = params.orderId as string;
+  const type = (params.type as string) || 'dine-in';
 
   const [rating, setRating] = useState<number>(0);
   const [hover, setHover] = useState<number>(0);
-
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
 
-  /* ---------------- SUBMIT ---------------- */
+  const selectedRating = hover || rating;
+
+  const ratingLabel = useMemo(() => {
+    if (selectedRating === 1) return 'Very Poor';
+    if (selectedRating === 2) return 'Poor';
+    if (selectedRating === 3) return 'Okay';
+    if (selectedRating === 4) return 'Good';
+    if (selectedRating === 5) return 'Excellent';
+    return 'Tap to rate';
+  }, [selectedRating]);
+
+  const goBackToList = () => {
+    router.push(type === 'parcel' ? '/counter/parcel' : '/counter/tables');
+  };
+
+  const submitFeedback = async (payload: {
+    rating: number;
+    comment: string;
+  }) => {
+    const res = await fetch('/api/counter/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        orderId,
+        rating: payload.rating,
+        comment: payload.comment,
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(data?.error || 'Feedback submit failed');
+    }
+
+    return data;
+  };
 
   const handleSubmit = async () => {
     if (!orderId) return;
@@ -25,125 +65,140 @@ export default function FeedbackPage() {
     try {
       setLoading(true);
 
-      const res = await fetch('/api/counter/feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          orderId,
-          rating,
-          comment,
-        }),
+      await submitFeedback({
+        rating,
+        comment: comment.trim(),
       });
 
-      const text = await res.text();
-
-      let data: any = null;
-      try {
-        data = text ? JSON.parse(text) : null;
-      } catch {
-        data = { error: text || 'Invalid server response' };
-      }
-
-      if (!res.ok) {
-        console.error('Feedback submit failed:', data);
-        alert(data?.error || 'Feedback submit failed');
-        return;
-      }
-
-      router.push('/counter/tables');
-    } catch (err) {
+      goBackToList();
+    } catch (err: any) {
       console.error('Feedback submit error:', err);
-      alert('Something went wrong');
+      notification.error(err.message || 'Something went wrong');
     } finally {
       setLoading(false);
     }
   };
 
-  /* ---------------- SKIP ---------------- */
-
   const skipFeedback = async () => {
-    if (!orderId) return;
+    if (!orderId || loading) return;
 
-    await fetch('/api/counter/feedback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        orderId,
+    try {
+      setLoading(true);
+
+      await submitFeedback({
         rating: 5,
         comment: '',
-      }),
-    });
+      });
 
-    router.push('/counter/tables');
+      goBackToList();
+    } catch (err: any) {
+      console.error('Skip feedback error:', err);
+      notification.error(err.message || 'Something went wrong');
+      setLoading(false);
+    }
   };
 
-  /* ---------------- UI ---------------- */
-
   return (
-    <div className="min-h-screen flex items-center justify-center p-6">
-      <div className="border shadow-xl rounded-2xl p-8 w-full max-w-md space-y-6">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold">How was your experience?</h1>
+    <div className="min-h-screen px-4 py-6 md:px-6 md:py-10">
+      <div className="mx-auto max-w-xl">
+        <Card
+          variant="ghost"
+          hover={false}
+          className="border border-[#3b2a1a]/15 bg-transparent shadow-none rounded-3xl p-6 md:p-8"
+        >
+          <div className="space-y-6">
+            {/* HEADER */}
+            <div className="text-center space-y-3">
+              <Badge variant="outline" className="bg-transparent">
+                Feedback
+              </Badge>
 
-          <p className="text-sm text-gray-500 mt-1">
-            Your feedback helps us improve
-          </p>
-        </div>
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold">
+                  How was your experience?
+                </h1>
 
-        {/* STAR RATING */}
+                <p className="text-sm text-gray-500 mt-2">
+                  Your feedback helps us improve service quality and speed.
+                </p>
+              </div>
+            </div>
 
-        <div className="flex justify-center gap-3 text-4xl">
-          {[1, 2, 3, 4, 5].map((star) => (
-            <span
-              key={star}
-              onClick={() => setRating(star)}
-              onMouseEnter={() => setHover(star)}
-              onMouseLeave={() => setHover(0)}
-              className={`cursor-pointer transition ${
-                star <= (hover || rating) ? 'text-yellow-500' : 'text-gray-100'
-              }`}
-            >
-              ★
-            </span>
-          ))}
-        </div>
+            {/* STAR RATING */}
+            <div className="rounded-2xl border border-[#3b2a1a]/10 p-5 text-center space-y-4">
+              <div className="flex justify-center gap-2 sm:gap-3 text-4xl md:text-5xl">
+                {[1, 2, 3, 4, 5].map((star) => {
+                  const active = star <= selectedRating;
 
-        {/* COMMENT */}
+                  return (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setRating(star)}
+                      onMouseEnter={() => setHover(star)}
+                      onMouseLeave={() => setHover(0)}
+                      className={`transition-transform duration-150 hover:scale-110 ${
+                        active ? 'text-yellow-500' : 'text-gray-200'
+                      }`}
+                      aria-label={`Rate ${star} star`}
+                    >
+                      ★
+                    </button>
+                  );
+                })}
+              </div>
 
-        <div>
-          <label htmlFor="comment" className="block text-sm font-medium mb-2">
-            Comment (optional)
-          </label>
+              <p className="text-sm font-medium text-[#3b2a1a]">
+                {ratingLabel}
+              </p>
+            </div>
 
-          <textarea
-            id="comment"
-            placeholder="Tell us what you liked or how we can improve..."
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            className="w-full border rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-green-500"
-            rows={4}
-          />
-        </div>
+            {/* COMMENT */}
+            <div className="space-y-2">
+              <label
+                htmlFor="comment"
+                className="block text-sm font-medium text-[#3b2a1a]"
+              >
+                Comment <span className="text-gray-500">(optional)</span>
+              </label>
 
-        {/* ACTIONS */}
+              <textarea
+                id="comment"
+                placeholder="Tell us what you liked or how we can improve..."
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                rows={4}
+                className="w-full rounded-2xl border border-[#3b2a1a]/15 bg-transparent px-4 py-3 resize-none outline-none transition focus:border-[#3b2a1a]/30"
+              />
 
-        <div className="flex flex-col gap-3">
-          <Button
-            onClick={handleSubmit}
-            disabled={loading}
-            className="bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700 transition"
-          >
-            {loading ? 'Submitting...' : 'Submit Feedback'}
-          </Button>
+              <p className="text-xs text-gray-500">
+                Keep it short and practical.
+              </p>
+            </div>
 
-          <button
-            onClick={skipFeedback}
-            className="text-sm text-gray-500 hover:underline"
-          >
-            Skip feedback
-          </button>
-        </div>
+            {/* ACTIONS */}
+            <div className="space-y-3">
+              <Button
+                type="button"
+                onClick={handleSubmit}
+                disabled={loading}
+                className="w-full"
+              >
+                {loading ? 'Submitting...' : 'Submit Feedback'}
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={skipFeedback}
+                disabled={loading}
+                className="w-full"
+              >
+                Skip for Now
+              </Button>
+            </div>
+          </div>
+        </Card>
       </div>
     </div>
   );
